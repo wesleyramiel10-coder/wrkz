@@ -3,7 +3,7 @@
  * Os dados NÃO ficam aqui: eles vêm sempre da API (o modo off-line é a Etapa 2).
  * Ao mudar qualquer arquivo do app, aumente o número da VERSAO para o celular baixar a nova versão.
  */
-const VERSAO = 'wrkz-v1';
+const VERSAO = 'wrkz-v2';
 const ARQUIVOS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable.png'];
 
 self.addEventListener('install', (e) => {

@@ -207,6 +207,29 @@
            padding:10px 18px; border-radius:99px; font-size:14px; font-weight:600; opacity:0; transition:all .2s; pointer-events:none; z-index:40; }
   #toast.show { opacity:1; transform:translateX(-50%); }
   #toast.err { background:var(--neg); color:#fff; }
+  /* Tela de bloqueio (PIN e biometria) */
+  #trava { position:fixed; inset:0; z-index:60; background:var(--bg); display:flex; flex-direction:column; align-items:center;
+           justify-content:center; padding:calc(env(safe-area-inset-top,0px) + 24px) 24px calc(env(safe-area-inset-bottom,0px) + 24px); overflow-y:auto; }
+  #trava[hidden] { display:none; }
+  .tv-ico { width:56px; height:56px; border-radius:18px; background:var(--hero); color:#fff; display:flex; align-items:center; justify-content:center; margin-bottom:16px; }
+  .tv-tit { font-size:22px; font-weight:800; letter-spacing:-.4px; margin:0; text-align:center; }
+  .tv-sub { color:var(--muted); font-size:14px; margin:4px 0 24px; text-align:center; max-width:300px; }
+  .tv-pontos { display:flex; gap:16px; margin-bottom:12px; }
+  .tv-pontos i { width:14px; height:14px; border-radius:50%; border:2px solid var(--muted); transition:background .12s; }
+  .tv-pontos i.on { background:var(--brand); border-color:var(--brand); }
+  .tv-pontos.erro { animation:tremer .35s; }
+  @keyframes tremer { 25% { transform:translateX(-9px); } 75% { transform:translateX(9px); } }
+  @media (prefers-reduced-motion: reduce) { .tv-pontos.erro { animation:none; } }
+  .tv-msg { min-height:42px; font-size:13.5px; color:var(--neg); font-weight:600; margin-bottom:10px; text-align:center; max-width:300px; }
+  .tv-msg.neutro { color:var(--muted); }
+  .tv-teclado { display:grid; grid-template-columns:repeat(3, 72px); gap:14px 24px; }
+  .tv-teclado button { width:72px; height:72px; border-radius:50%; border:1px solid var(--line); background:var(--surface);
+                       font-size:26px; font-weight:700; display:flex; align-items:center; justify-content:center; padding:0; }
+  .tv-teclado button.sem { border:0; background:transparent; }
+  .tv-teclado button:active { background:var(--brand-soft); }
+  .tv-link { margin-top:22px; background:none; border:0; color:var(--brand); font-weight:700; font-size:14px; padding:8px; }
+  /* Modo discreto: valores trocados por R$ •••• e campos de valor mascarados */
+  body.discreto input.num, body.discreto .inp-pg { -webkit-text-security:disc; }
   #busy { position:fixed; top:0; left:0; height:3px; width:0; background:var(--brand); transition:width .4s; z-index:50; }
 </style>
 </head>
@@ -217,6 +240,7 @@
     <div><h1 class="mes" id="titulo">Carregando…</h1><div class="mes-sub" id="subtitulo"></div></div>
     <div class="acoes">
       <button class="icbtn" data-act="recarregar" aria-label="Atualizar" id="b-atualizar"></button>
+      <button class="icbtn" data-act="discreto" aria-label="Esconder valores" id="b-discreto"></button>
       <button class="icbtn" data-act="ajustes" aria-label="Ajustes" id="b-ajustes"></button>
     </div>
   </header>
@@ -225,6 +249,7 @@
 <nav class="tab" id="nav"></nav>
 <div id="veu"><div id="folha" role="dialog" aria-modal="true"></div></div>
 <div id="toast"></div>
+<div id="trava" hidden></div>
 
 <script>
 var D = null, PAG = 'inicio', SUB = 'saude', CSUB = 'contas', AG = 'atual', TIPO = 'Gasto', FOLHA = '', SIM = null, EDIT = null;
@@ -250,7 +275,12 @@ var ICO = {
   entra: '<path d="M17 7 7 17M7 9v8h8"/>',
   sai: '<path d="M7 17 17 7M9 7h8v8"/>',
   meta: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>',
-  i: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.8v.01"/>'
+  i: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.8v.01"/>',
+  olho: '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+  olhoOff: '<path d="M3 3l18 18"/><path d="M10.6 5.1A10.8 10.8 0 0 1 12 5c6.4 0 10 7 10 7a17.6 17.6 0 0 1-3.2 4.1M6.6 6.6C3.9 8.3 2 12 2 12s3.6 7 10 7c1.9 0 3.6-.6 5-1.4"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/>',
+  cadeado: '<rect x="4.5" y="10.5" width="15" height="10.5" rx="2.5"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/>',
+  digital: '<path d="M12 11v3.5a6 6 0 0 1-1.2 3.6"/><path d="M8.5 9.5a3.5 3.5 0 0 1 7 0v5c0 1.4-.3 2.8-.9 4"/><path d="M5.5 15V9.5a6.5 6.5 0 0 1 11.6-4"/><path d="M18.5 9.5v4"/>',
+  apagar: '<path d="M21 5H9l-6 7 6 7h12a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1z"/><path d="M17 9l-5 6M12 9l5 6"/>'
 };
 function ico(n, t) {
   t = t || 20;
@@ -343,7 +373,7 @@ var INFO = {
 
 // ---------- utilidades ----------
 var FMT = new Intl.NumberFormat('pt-BR', { style:'currency', currency:'BRL' });
-function brl(n) { return FMT.format(Number(n) || 0); }
+function brl(n) { return DISCRETO ? 'R$ ••••' : FMT.format(Number(n) || 0); }
 function sinal(n) { return (n > 0 ? '+' : '') + brl(n); }
 function pctTxt(n) { return Math.round(n * 100) + '%'; }
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]; }); }
@@ -419,12 +449,9 @@ function toast(msg, err) {
 function busy(on) { document.getElementById('busy').style.width = on ? '70%' : '0'; }
 
 // ---------- comunicação com o servidor (API do Apps Script) ----------
-// A URL e a chave ficam só neste aparelho (nunca no GitHub).
-// Etapa 1, passo 4: elas passam a ficar criptografadas pelo PIN.
-var CX_CHAVE = 'wrkz_conexao';
-function conexao() {
-  try { return JSON.parse(localStorage.getItem(CX_CHAVE) || 'null'); } catch (e) { return null; }
-}
+// A URL e a chave ficam só neste aparelho, dentro de um cofre criptografado pelo PIN.
+// Enquanto o app está desbloqueado, elas ficam só na memória (variável CX).
+function conexao() { return CX; }
 function apiCom(cx, fn, args) {
   // Sem cabeçalho Content-Type de propósito: assim o navegador manda como texto simples e o Apps Script aceita.
   return fetch(cx.url, { method: 'POST', redirect: 'follow', body: JSON.stringify({ chave: cx.chave, fn: fn, args: args || [] }) })
@@ -435,18 +462,18 @@ function apiCom(cx, fn, args) {
     });
 }
 function api(fn, args) {
-  var cx = conexao();
-  if (!cx) return Promise.reject(new Error('Este aparelho ainda não está conectado.'));
-  return apiCom(cx, fn, args);
+  if (!CX) return Promise.reject(new Error('O app está bloqueado.'));
+  return apiCom(CX, fn, args);
 }
 function falha(e) {
   if (e.chave) { toast('A chave foi recusada. Confira a conexão.', true); telaConexao(); return; }
   toast(navigator.onLine ? 'Erro: ' + e.message : 'Sem internet. Tente de novo quando conectar.', true);
   if (!D) document.getElementById('app').innerHTML = '<div class="vazio">Não foi possível carregar suas contas.<br>' +
-    '<button class="btn" data-act="recarregar" style="margin-top:12px">Tentar de novo</button></div>';
+    '<div class="botoes" style="margin-top:12px"><button class="btn" data-act="recarregar">Tentar de novo</button>' +
+    '<button class="btn" data-act="conexao">Conexão</button></div></div>';
 }
 function load() {
-  if (!conexao()) { telaConexao(); return; }
+  if (!CX) { if (lerCofre()) mostrarTrava('abrir', '', true); else telaConexao(); return; }
   busy(true);
   api('getDados')
     .then(function (d) { busy(false); D = d; render(); atalho(); })
@@ -466,7 +493,6 @@ function call(fn) {
 
 // ---------- conexão deste aparelho ----------
 function telaConexao() {
-  var cx = conexao();
   fecharFolha();
   document.getElementById('titulo').textContent = 'Conectar';
   document.getElementById('subtitulo').textContent = 'Ligue este aparelho à sua planilha';
@@ -474,13 +500,13 @@ function telaConexao() {
   document.getElementById('app').innerHTML =
     '<div class="painel">' +
     '<p class="dica">Cole aqui a URL da implantação "API app" (termina em /exec) e a chave secreta que o gerarChave() mostrou. ' +
-    'As duas ficam guardadas só neste aparelho.</p>' +
+    'Depois você cria um PIN, e as duas ficam guardadas só neste aparelho, criptografadas.</p>' +
     '<label class="campo"><span>URL da API</span><input id="cx-url" type="url" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" ' +
-    'placeholder="https://script.google.com/macros/s/…/exec" value="' + esc(cx ? cx.url : '') + '"></label>' +
+    'placeholder="https://script.google.com/macros/s/…/exec" value="' + esc(CX ? CX.url : '') + '"></label>' +
     '<label class="campo"><span>Chave secreta</span><input id="cx-chave" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" ' +
     'placeholder="Cole a chave"></label>' +
     '<button class="btn prim full" data-act="cx-salvar">Testar e conectar</button>' +
-    (cx ? '<div class="botoes" style="margin-top:10px"><button class="btn" data-act="recarregar">Voltar</button>' +
+    (CX ? '<div class="botoes" style="margin-top:10px"><button class="btn" data-act="recarregar">Voltar</button>' +
           '<button class="btn perigo" data-act="cx-sair">Desconectar</button></div>' : '') +
     '</div>';
 }
@@ -488,18 +514,304 @@ function salvarConexao() {
   var url = val('cx-url').trim(), chave = val('cx-chave').trim();
   if (!/^https:\/\/script\.google\.com\/.+\/exec$/.test(url)) { toast('A URL precisa começar com https://script.google.com e terminar em /exec', true); return; }
   if (chave.length < 20) { toast('Cole a chave completa', true); return; }
+  var novo = { url: url, chave: chave };
   busy(true);
-  apiCom({ url: url, chave: chave }, 'ping')
+  apiCom(novo, 'ping')
     .then(function () {
       busy(false);
-      localStorage.setItem(CX_CHAVE, JSON.stringify({ url: url, chave: chave }));
-      toast('Conectado'); D = null; load();
+      if (lerCofre() && DKRAW) {
+        // Já tem PIN: só troca a conexão guardada no cofre.
+        return regravarDados(novo).then(function () { toast('Conexão atualizada'); D = null; load(); });
+      }
+      // Primeira conexão: agora cria o PIN.
+      PENDENTE = novo; localStorage.removeItem(COFRE);
+      mostrarTrava('criar1');
     })
     .catch(function (e) { busy(false); toast(e.chave ? 'Chave recusada. Confira e cole de novo.' : 'Não conectou: ' + e.message, true); });
 }
 function sairConexao() {
-  if (!confirm('Desconectar este aparelho? A URL e a chave serão apagadas daqui. A planilha não muda.')) return;
-  localStorage.removeItem(CX_CHAVE); D = null; telaConexao();
+  if (!confirm('Desconectar este aparelho? A URL, a chave e o PIN serão apagados daqui. A planilha não muda.')) return;
+  apagarTudoLocal(); telaConexao();
+}
+function apagarTudoLocal() {
+  [COFRE, ERROS, 'wrkz_conexao'].forEach(function (k) { localStorage.removeItem(k); });
+  CX = null; DKRAW = null; D = null; PENDENTE = null;
+}
+
+// ---------- segurança: cofre criptografado, PIN, biometria e bloqueio automático ----------
+// Como funciona:
+// - Uma chave aleatória (DK) criptografa a URL e a chave da API (AES-GCM, 256 bits).
+// - A DK fica guardada duas vezes: trancada pelo PIN (PBKDF2, 310 mil rodadas) e, se ativada, pela biometria
+//   (chave de acesso com a extensão PRF, que devolve um segredo só depois da digital).
+// - Nada disso sai do aparelho. Sem o PIN ou a digital, o cofre é só um monte de letras sem sentido.
+var COFRE = 'wrkz_cofre', ERROS = 'wrkz_erros', PREF_BLOQ = 'wrkz_bloquear', PREF_DISC = 'wrkz_discreto';
+var CX = null, DKRAW = null, PENDENTE = null, NA_BIO = false;
+var TV = { modo: '', pin: '', primeiro: '', ocupado: false };
+var SAIU_EM = 0, ULTIMO_TOQUE = Date.now(), INATIVO_MS = 5 * 60 * 1000;
+var DISCRETO = localStorage.getItem(PREF_DISC) === '1';
+var TE = new TextEncoder(), TD = new TextDecoder();
+
+function rnd(n) { return crypto.getRandomValues(new Uint8Array(n)); }
+function b64(buf) { var u = new Uint8Array(buf), s = ''; for (var i = 0; i < u.length; i++) s += String.fromCharCode(u[i]); return btoa(s); }
+function unb64(s) { var b = atob(s), u = new Uint8Array(b.length); for (var i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; }
+function aesKey(raw) { return crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt', 'decrypt']); }
+function chavePin(pin, salt) {
+  return crypto.subtle.importKey('raw', TE.encode(pin), 'PBKDF2', false, ['deriveKey']).then(function (k) {
+    return crypto.subtle.deriveKey({ name: 'PBKDF2', salt: salt, iterations: 310000, hash: 'SHA-256' }, k,
+      { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+  });
+}
+function cifrar(key, bytes) {
+  var iv = rnd(12);
+  return crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, key, bytes).then(function (ct) { return { iv: b64(iv), ct: b64(ct) }; });
+}
+function decifrar(key, o) {
+  return crypto.subtle.decrypt({ name: 'AES-GCM', iv: unb64(o.iv) }, key, unb64(o.ct)).then(function (b) { return new Uint8Array(b); });
+}
+function lerCofre() { try { return JSON.parse(localStorage.getItem(COFRE) || 'null'); } catch (e) { return null; } }
+function gravarCofre(c) { localStorage.setItem(COFRE, JSON.stringify(c)); }
+
+function criarCofre(cx, pin) {
+  var raw = rnd(32), salt = rnd(16), c = { v: 1, bio: null };
+  return aesKey(raw)
+    .then(function (k) { return cifrar(k, TE.encode(JSON.stringify(cx))); })
+    .then(function (d) { c.dados = d; return chavePin(pin, salt); })
+    .then(function (kp) { return cifrar(kp, raw); })
+    .then(function (w) {
+      c.pin = { salt: b64(salt), iv: w.iv, ct: w.ct };
+      gravarCofre(c); localStorage.removeItem('wrkz_conexao');   // apaga a cópia sem criptografia do passo 3
+      DKRAW = raw; CX = cx;
+    });
+}
+function abrirComRaw(raw) {
+  return aesKey(raw).then(function (k) { return decifrar(k, lerCofre().dados); })
+    .then(function (b) { DKRAW = raw; CX = JSON.parse(TD.decode(b)); });
+}
+function abrirComPin(pin) {
+  var c = lerCofre();
+  return chavePin(pin, unb64(c.pin.salt)).then(function (kp) { return decifrar(kp, c.pin); }).then(abrirComRaw);
+}
+function regravarDados(cx) {
+  return aesKey(DKRAW).then(function (k) { return cifrar(k, TE.encode(JSON.stringify(cx))); })
+    .then(function (d) { var c = lerCofre(); c.dados = d; gravarCofre(c); CX = cx; });
+}
+function regravarPin(pin) {
+  var salt = rnd(16);
+  return chavePin(pin, salt).then(function (kp) { return cifrar(kp, DKRAW); })
+    .then(function (w) { var c = lerCofre(); c.pin = { salt: b64(salt), iv: w.iv, ct: w.ct }; gravarCofre(c); });
+}
+
+// Tentativas erradas: a partir da 5ª, espera crescente (30 s, 1 min, 2 min...). Na 10ª, o cofre é apagado.
+function lerErros() { try { return JSON.parse(localStorage.getItem(ERROS) || '{"n":0,"ate":0}'); } catch (e) { return { n: 0, ate: 0 }; } }
+function esperaRestante() { return Math.max(0, lerErros().ate - Date.now()); }
+function registrarErro() {
+  var e = lerErros(); e.n++;
+  if (e.n >= 10) { apagarTudoLocal(); return null; }
+  if (e.n >= 5) e.ate = Date.now() + Math.min(30000 * Math.pow(2, e.n - 5), 900000);
+  localStorage.setItem(ERROS, JSON.stringify(e));
+  return e;
+}
+function pinFraco(p) {
+  return /^(\d)\1{5}$/.test(p) || '01234567890'.indexOf(p) >= 0 || '09876543210'.indexOf(p) >= 0;
+}
+
+// ----- tela do PIN -----
+function mostrarTrava(modo, msg, semBio) {
+  TV.modo = modo; TV.pin = ''; TV.ocupado = false;
+  var c = lerCofre(), temBio = modo === 'abrir' && c && c.bio;
+  var tit = { abrir: 'Digite seu PIN', criar1: 'Crie um PIN de 6 dígitos', criar2: 'Repita o PIN',
+              trocar1: 'Novo PIN de 6 dígitos', trocar2: 'Repita o novo PIN' }[modo];
+  var sub = { abrir: 'O app está bloqueado.' + (temBio ? ' Use a digital ou o PIN.' : ''),
+              criar1: 'Ele tranca a URL e a chave guardadas neste aparelho. Não use datas fáceis.',
+              criar2: 'Digite de novo para confirmar.', trocar1: 'Ele vai substituir o PIN atual.', trocar2: 'Digite de novo para confirmar.' }[modo];
+  var teclas = ['1', '2', '3', '4', '5', '6', '7', '8', '9', temBio ? 'bio' : '', '0', 'apagar'];
+  var el = document.getElementById('trava');
+  el.innerHTML = '<div class="tv-ico">' + ico('cadeado', 26) + '</div>' +
+    '<h2 class="tv-tit">' + tit + '</h2><p class="tv-sub">' + sub + '</p>' +
+    '<div class="tv-pontos" id="tv-pontos">' + new Array(7).join('<i></i>') + '</div>' +
+    '<div class="tv-msg" id="tv-msg" role="status">' + esc(msg || '') + '</div>' +
+    '<div class="tv-teclado">' + teclas.map(function (k) {
+      if (!k) return '<button class="sem" tabindex="-1" aria-hidden="true"></button>';
+      if (k === 'bio') return '<button data-act="tv-bio" aria-label="Usar biometria">' + ico('digital', 28) + '</button>';
+      if (k === 'apagar') return '<button class="sem" data-act="tv-apagar" aria-label="Apagar">' + ico('apagar', 26) + '</button>';
+      return '<button data-act="tv-d" data-d="' + k + '">' + k + '</button>';
+    }).join('') + '</div>' +
+    (modo === 'trocar1' || modo === 'trocar2' ? '<button class="tv-link" data-act="tv-cancelar">Cancelar</button>' : '') +
+    (modo === 'abrir' ? '<button class="tv-link" data-act="tv-esqueci">Esqueci o PIN</button>' : '');
+  el.hidden = false;
+  if (temBio && !msg && !semBio && !document.hidden) setTimeout(abrirComBio, 350);
+}
+function esconderTrava() { var el = document.getElementById('trava'); el.hidden = true; el.innerHTML = ''; TV.modo = ''; }
+function travaVisivel() { return !document.getElementById('trava').hidden; }
+function tvPontos() {
+  var p = document.querySelectorAll('#tv-pontos i');
+  for (var i = 0; i < p.length; i++) p[i].className = i < TV.pin.length ? 'on' : '';
+}
+function tvMsg(t, neutro) { var m = document.getElementById('tv-msg'); if (m) { m.textContent = t; m.className = 'tv-msg' + (neutro ? ' neutro' : ''); } }
+function tremer() { var p = document.getElementById('tv-pontos'); if (p) { p.className = 'tv-pontos erro'; } }
+
+function tvDigito(d) {
+  if (TV.ocupado || TV.pin.length >= 6) return;
+  var w = esperaRestante();
+  if (TV.modo === 'abrir' && w) { tvMsg('Aguarde ' + Math.ceil(w / 1000) + ' s para tentar de novo.'); return; }
+  TV.pin += d; tvPontos();
+  if (TV.pin.length === 6) setTimeout(tvConcluir, 120);
+}
+function tvApagar() { if (TV.ocupado) return; TV.pin = TV.pin.slice(0, -1); tvPontos(); }
+
+function tvConcluir() {
+  var pin = TV.pin, modo = TV.modo;
+  if (modo === 'criar1' || modo === 'trocar1') {
+    if (pinFraco(pin)) { mostrarTrava(modo, 'Esse PIN é fácil de adivinhar. Escolha outro.'); tremer(); return; }
+    mostrarTrava(modo === 'criar1' ? 'criar2' : 'trocar2'); TV.primeiro = pin; return;
+  }
+  if (modo === 'criar2' || modo === 'trocar2') {
+    var volta = modo === 'criar2' ? 'criar1' : 'trocar1';
+    if (pin !== TV.primeiro) { mostrarTrava(volta, 'Os dois PINs ficaram diferentes. Comece de novo.'); tremer(); return; }
+    TV.ocupado = true; tvMsg('Salvando…', true);
+    (modo === 'criar2' ? criarCofre(PENDENTE, pin) : regravarPin(pin))
+      .then(function () {
+        PENDENTE = null; esconderTrava(); ULTIMO_TOQUE = Date.now();
+        toast(modo === 'criar2' ? 'PIN criado' : 'PIN trocado');
+        if (modo === 'criar2') { D = null; load(); }
+      })
+      .catch(function (e) { mostrarTrava(volta, 'Não deu para salvar: ' + e.message); });
+    return;
+  }
+  // modo abrir
+  TV.ocupado = true; tvMsg('Conferindo…', true);
+  abrirComPin(pin).then(desbloqueado).catch(function () {
+    var r = registrarErro();
+    if (!r) { esconderTrava(); telaConexao(); toast('Muitas tentativas erradas: a conexão foi apagada deste aparelho. Conecte de novo.', true); return; }
+    var resta = 10 - r.n, w = esperaRestante();
+    mostrarTrava('abrir', 'PIN incorreto.' + (w ? ' Aguarde ' + Math.ceil(w / 1000) + ' s.' : '') +
+      (resta <= 5 ? ' Restam ' + resta + ' tentativas antes de apagar a conexão deste aparelho.' : ''), true);
+    tremer();
+  });
+}
+function desbloqueado() {
+  TV.ocupado = false; localStorage.removeItem(ERROS);
+  esconderTrava(); ULTIMO_TOQUE = Date.now(); D = null; load();
+}
+function esqueciPin() {
+  if (!confirm('Sem o PIN, a conexão deste aparelho será apagada. Depois é só conectar de novo com a URL e a chave. Continuar?')) return;
+  apagarTudoLocal(); esconderTrava(); telaConexao();
+}
+
+// ----- biometria (chave de acesso com PRF) -----
+function bioPrf(credId, salt) {
+  NA_BIO = true;
+  return navigator.credentials.get({ publicKey: {
+      challenge: rnd(32), rpId: location.hostname, timeout: 60000, userVerification: 'required',
+      allowCredentials: [{ type: 'public-key', id: credId }],
+      extensions: { prf: { eval: { first: salt } } } } })
+    .then(function (cred) {
+      NA_BIO = false;
+      var r = cred.getClientExtensionResults().prf;
+      if (!r || !r.results || !r.results.first) throw new Error('SEM_PRF');
+      return new Uint8Array(r.results.first);
+    }, function (e) { NA_BIO = false; throw e; });
+}
+function abrirComBio() {
+  var c = lerCofre();
+  if (!c || !c.bio || TV.ocupado || TV.modo !== 'abrir') return;
+  TV.ocupado = true; tvMsg('Toque no sensor…', true);
+  bioPrf(unb64(c.bio.cred), unb64(c.bio.salt))
+    .then(function (prf) { return aesKey(prf).then(function (k) { return decifrar(k, c.bio); }); })
+    .then(abrirComRaw).then(desbloqueado)
+    .catch(function (e) {
+      TV.ocupado = false;
+      tvMsg(e && e.name === 'NotAllowedError' ? 'Biometria cancelada. Digite o PIN ou toque na digital.' : 'A biometria não funcionou. Digite o PIN.');
+    });
+}
+function ativarBio() {
+  if (!window.PublicKeyCredential || !DKRAW) { toast('Biometria não disponível neste navegador.', true); return; }
+  var salt = rnd(32), raw = DKRAW;
+  NA_BIO = true;
+  navigator.credentials.create({ publicKey: {
+      rp: { name: 'Contas Wesley', id: location.hostname },
+      user: { id: rnd(16), name: 'contas', displayName: 'Contas Wesley' },
+      challenge: rnd(32), timeout: 60000,
+      pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
+      authenticatorSelection: { authenticatorAttachment: 'platform', residentKey: 'preferred', userVerification: 'required' },
+      extensions: { prf: { eval: { first: salt } } } } })
+    .then(function (cred) {
+      NA_BIO = false;
+      var credId = new Uint8Array(cred.rawId), r = cred.getClientExtensionResults().prf || {};
+      if (r.results && r.results.first) return { credId: credId, prf: new Uint8Array(r.results.first) };
+      if (r.enabled === false) throw new Error('SEM_PRF');
+      return bioPrf(credId, salt).then(function (prf) { return { credId: credId, prf: prf }; });
+    })
+    .then(function (x) {
+      return aesKey(x.prf).then(function (k) { return cifrar(k, raw); }).then(function (w) {
+        var c = lerCofre(); c.bio = { cred: b64(x.credId), salt: b64(salt), iv: w.iv, ct: w.ct }; gravarCofre(c);
+      });
+    })
+    .then(function () { toast('Biometria ativada'); if (FOLHA === 'ajustes') folhaAjustes(); })
+    .catch(function (e) {
+      NA_BIO = false;
+      toast(e.message === 'SEM_PRF' ? 'Este aparelho não oferece biometria com criptografia para sites. Continue usando o PIN.' :
+            e.name === 'NotAllowedError' ? 'Ativação cancelada.' : 'Não deu para ativar: ' + e.message, true);
+    });
+}
+function desativarBio() {
+  if (!confirm('Desativar a biometria? O app passa a abrir só com o PIN.')) return;
+  var c = lerCofre(); c.bio = null; gravarCofre(c);
+  toast('Biometria desativada'); if (FOLHA === 'ajustes') folhaAjustes();
+}
+
+// ----- bloqueio automático -----
+function tempoBloq() { var v = localStorage.getItem(PREF_BLOQ); return v === null ? 60000 : Number(v); }
+function travar(semBio) {
+  if (!CX || !lerCofre()) return;
+  CX = null; DKRAW = null; D = null;
+  fecharFolha();
+  document.getElementById('app').innerHTML = '';
+  document.getElementById('nav').innerHTML = '';
+  document.getElementById('titulo').textContent = 'Bloqueado';
+  document.getElementById('subtitulo').textContent = '';
+  mostrarTrava('abrir', '', semBio);
+}
+document.addEventListener('visibilitychange', function () {
+  if (NA_BIO) return;                                   // a janela da digital não conta como "sair do app"
+  if (document.hidden) { SAIU_EM = Date.now(); if (tempoBloq() === 0) travar(true); return; }
+  if (CX && SAIU_EM && Date.now() - SAIU_EM >= tempoBloq()) travar(true);
+  SAIU_EM = 0;
+  var c = lerCofre();
+  if (TV.modo === 'abrir' && travaVisivel() && c && c.bio && !TV.ocupado) setTimeout(abrirComBio, 350);
+});
+['click', 'touchstart', 'keydown'].forEach(function (t) {
+  document.addEventListener(t, function () { ULTIMO_TOQUE = Date.now(); }, { passive: true });
+});
+setInterval(function () { if (CX && !NA_BIO && Date.now() - ULTIMO_TOQUE > INATIVO_MS) travar(); }, 15000);
+
+// ----- modo discreto -----
+function aplicarDiscreto() {
+  document.body.classList.toggle('discreto', DISCRETO);
+  var b = document.getElementById('b-discreto');
+  b.innerHTML = ico(DISCRETO ? 'olhoOff' : 'olho', 18);
+  b.setAttribute('aria-label', DISCRETO ? 'Mostrar valores' : 'Esconder valores');
+}
+function alternarDiscreto() {
+  DISCRETO = !DISCRETO;
+  localStorage.setItem(PREF_DISC, DISCRETO ? '1' : '0');
+  aplicarDiscreto();
+  if (D) { render(); if (FOLHA === 'ajustes') folhaAjustes(); }
+  toast(DISCRETO ? 'Valores escondidos' : 'Valores visíveis');
+}
+
+// ----- partida -----
+function iniciar() {
+  aplicarDiscreto();
+  if (lerCofre()) { mostrarTrava('abrir'); return; }
+  var antigo = null;
+  try { antigo = JSON.parse(localStorage.getItem('wrkz_conexao') || 'null'); } catch (e) {}
+  if (antigo && antigo.url && antigo.chave) {             // veio do passo 3: só falta criar o PIN
+    PENDENTE = antigo;
+    document.getElementById('titulo').textContent = 'Proteger';
+    mostrarTrava('criar1'); return;
+  }
+  telaConexao();
 }
 
 // ---------- atalhos do ícone (segurar o ícone do app) ----------
@@ -522,6 +834,24 @@ document.addEventListener('click', function (ev) {
   if (act === 'cx-salvar') salvarConexao();
   if (act === 'cx-sair') sairConexao();
   if (act === 'conexao') telaConexao();
+  if (act === 'tv-d') tvDigito(t.getAttribute('data-d'));
+  if (act === 'tv-apagar') tvApagar();
+  if (act === 'tv-bio') abrirComBio();
+  if (act === 'tv-esqueci') esqueciPin();
+  if (act === 'tv-cancelar') esconderTrava();
+  if (act === 'discreto') alternarDiscreto();
+  if (act === 'bio-ativar') ativarBio();
+  if (act === 'bio-desativar') desativarBio();
+  if (act === 'trocar-pin') { fecharFolha(); mostrarTrava('trocar1'); }
+  if (act === 'bloquear') travar();
+});
+document.addEventListener('keydown', function (ev) {
+  if (!travaVisivel()) return;
+  if (/^\d$/.test(ev.key)) { ev.preventDefault(); tvDigito(ev.key); }
+  if (ev.key === 'Backspace') { ev.preventDefault(); tvApagar(); }
+});
+document.addEventListener('change', function (ev) {
+  if (ev.target.id === 'aj-bloq') { localStorage.setItem(PREF_BLOQ, ev.target.value); toast('Salvo'); }
 });
 
 // ---------- tela ----------
@@ -1185,6 +1515,17 @@ function folhaAjustes() {
     campo('Reserva já guardada', 'res', 'O que já estava guardado antes de dezembro.') +
     campo('Meta da reserva (meses)', 'meta', 'Quantos meses de custo fixo você quer ter guardado.', true) +
     '<p class="dica">Os dias de fechamento e vencimento dos cartões se mudam na tela Contas, aba Cartão, em Editar datas do cartão.</p>' +
+    '<h3 class="sec" style="margin-top:22px">Segurança deste aparelho</h3>' +
+    '<label class="campo"><span>Bloquear o app</span><select id="aj-bloq">' +
+      [['0', 'Assim que sair do app'], ['60000', '1 minuto depois de sair'], ['300000', '5 minutos depois de sair']].map(function (o) {
+        return '<option value="' + o[0] + '"' + (String(tempoBloq()) === o[0] ? ' selected' : '') + '>' + o[1] + '</option>';
+      }).join('') + '</select></label>' +
+    '<p class="dica" style="margin-top:-6px">Com o app aberto e 5 minutos sem mexer, ele também bloqueia.</p>' +
+    '<div class="botoes" style="margin-bottom:10px">' +
+      (lerCofre() && lerCofre().bio ? '<button class="btn" data-act="bio-desativar">Desativar biometria</button>'
+                                     : '<button class="btn" data-act="bio-ativar">Ativar biometria</button>') +
+      '<button class="btn" data-act="trocar-pin">Trocar PIN</button></div>' +
+    '<button class="btn full" data-act="bloquear" style="margin-bottom:10px">Bloquear agora</button>' +
     '<button class="btn full" data-act="conexao" style="margin-bottom:10px">Conexão deste aparelho</button>' +
     '<button class="btn full" data-act="fechar-folha">Pronto</button>';
   abrirFolha('ajustes', h);
@@ -1387,7 +1728,7 @@ document.getElementById('b-ajustes').innerHTML = ico('ajustes', 18);
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
 }
-load();
+iniciar();
 </script>
 </body>
 </html>
