@@ -1,0 +1,1393 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f3b8f">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="referrer" content="no-referrer">
+<title>Contas Wesley</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#f3f4f7; --surface:#ffffff; --ink:#151a24; --muted:#636b7a; --line:#e3e6ec; --soft:#eceef3;
+    --brand:#2f55d4; --on-brand:#ffffff; --brand-soft:#e6ecfd; --hero:#1f3b8f; --hero-alerta:#9b2c22; --cc:#1b2340;
+    --pos:#16855f; --pos-soft:#e3f4ec; --neg:#c8372d; --neg-soft:#fce8e6; --warn:#b06d0b; --warn-soft:#fdf1dc;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:#0f1115; --surface:#181b21; --ink:#e9ecf2; --muted:#9aa2b1; --line:#2a2f38; --soft:#22262e;
+      --brand:#7c9cff; --on-brand:#0b1430; --brand-soft:#1f2a4a; --hero:#22408f; --hero-alerta:#7d241c; --cc:#26304f;
+      --pos:#4fd1a0; --pos-soft:#15362b; --neg:#ff8a7d; --neg-soft:#3b1f1c; --warn:#f0b450; --warn-soft:#3a2d14;
+    }
+  }
+  * { box-sizing:border-box; }
+  html, body { margin:0; overflow-x:hidden; }
+  body { background:var(--bg); color:var(--ink); font:15px/1.5 Manrope,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+         -webkit-font-smoothing:antialiased; padding-top:env(safe-area-inset-top,0px); }
+  button { font:inherit; color:inherit; cursor:pointer; }
+  :focus-visible { outline:2px solid var(--brand); outline-offset:2px; }
+  .num { font-variant-numeric:tabular-nums; }
+  .v-neg { color:var(--neg); } .v-pos { color:var(--pos); } .v-warn { color:var(--warn); }
+  .wrap { max-width:1080px; margin:0 auto; padding:12px 14px 130px; }
+
+  header.top { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:8px 0 16px; }
+  .mes { font-size:28px; font-weight:800; letter-spacing:-.8px; line-height:1.1; margin:0; }
+  .mes-sub { color:var(--muted); font-size:13px; margin-top:2px; }
+  .acoes { display:flex; gap:8px; flex:0 0 auto; }
+  .icbtn { width:42px; height:42px; border-radius:50%; border:1px solid var(--line); background:var(--surface);
+           display:inline-flex; align-items:center; justify-content:center; padding:0; }
+
+  .hero { background:var(--hero); color:#fff; border-radius:24px; padding:20px 18px 18px; margin-bottom:14px; }
+  .hero.alerta { background:var(--hero-alerta); }
+  .hero-top { display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:14px; }
+  .hero-tit { display:flex; align-items:center; gap:2px; }
+  .hero .ajuda { color:#fff; opacity:.85; }
+  .chip { background:rgba(255,255,255,.16); border-radius:99px; padding:3px 11px; font-weight:700; font-size:12.5px; white-space:nowrap; }
+  .big { font-size:42px; font-weight:800; letter-spacing:-1.5px; line-height:1.1; margin:6px 0 4px; }
+  .hero-sub { font-size:14.5px; opacity:.92; }
+  .regua { margin:20px 0 2px; }
+  .trilho { position:relative; height:6px; border-radius:99px; background:rgba(255,255,255,.2); }
+  .trilho span { position:absolute; left:0; top:0; bottom:0; border-radius:99px; background:rgba(255,255,255,.7); }
+  .trilho i { position:absolute; top:50%; width:14px; height:14px; border-radius:50%; background:#fff;
+              transform:translate(-50%,-50%); box-shadow:0 0 0 4px rgba(255,255,255,.25); }
+  .regua-leg { display:flex; justify-content:space-between; font-size:12px; opacity:.85; margin-top:9px; }
+  .hero-grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:10px; margin-top:16px; }
+  .hero-grid div { background:rgba(255,255,255,.12); border-radius:14px; padding:10px 12px; min-width:0; }
+  .hero-grid small { display:block; font-size:12px; opacity:.85; }
+  .hero-grid b { font-size:17px; font-weight:700; }
+  @media (max-width:380px) { .big { font-size:35px; } .hero-grid b { font-size:15px; } }
+
+  .cols { display:grid; grid-template-columns:minmax(0,1fr); gap:0 14px; }
+  .cols > div { min-width:0; }
+  @media (min-width:900px) { .cols { grid-template-columns:minmax(0,1.15fr) minmax(0,1fr); align-items:start; } }
+  .painel { background:var(--surface); border:1px solid var(--line); border-radius:18px; padding:16px 14px; margin-bottom:14px; min-width:0; }
+  .painel h2 { font-size:16.5px; margin:0; letter-spacing:-.2px; }
+  .ph { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:8px; }
+  .ph-txt { min-width:0; }
+  .ph-dir { display:flex; align-items:center; gap:6px; flex:0 0 auto; }
+  .ajuda { width:32px; height:32px; margin:-4px -6px 0 0; border:0; background:none; color:var(--muted);
+           display:inline-flex; align-items:center; justify-content:center; padding:0; border-radius:50%; }
+  .sub { color:var(--muted); font-size:13px; }
+  .aviso { border-radius:16px; padding:12px 14px; margin-bottom:14px; font-size:14px; font-weight:600; }
+  .aviso.neg { background:var(--neg-soft); color:var(--neg); }
+  .aviso.warn { background:var(--warn-soft); color:var(--warn); }
+
+  .linha { display:flex; justify-content:space-between; gap:12px; padding:8px 0; border-bottom:1px solid var(--line); font-size:14.5px; }
+  .linha:last-child { border-bottom:0; }
+  .linha .k { color:var(--muted); min-width:0; }
+  .linha b { white-space:nowrap; }
+  .linha.total { font-weight:800; font-size:16px; border-top:2px solid var(--ink); border-bottom:0; margin-top:6px; padding-top:10px; }
+  .linha.total .k { color:var(--ink); }
+  .barra { position:relative; height:8px; border-radius:99px; background:var(--soft); overflow:hidden; display:flex; margin:10px 0 6px; }
+  .barra span { height:100%; }
+  .barra .marca { position:absolute; top:-2px; bottom:-2px; width:2px; background:var(--ink); opacity:.55; }
+
+  .item { display:flex; align-items:center; gap:10px; padding:11px 0; border-bottom:1px solid var(--line); width:100%;
+          background:none; border-left:0; border-right:0; border-top:0; text-align:left; min-width:0; }
+  .item:last-child { border-bottom:0; }
+  .info { flex:1; min-width:0; }
+  .nome { font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .item.ok .nome { color:var(--muted); }
+  .valor { text-align:right; white-space:nowrap; font-weight:700; }
+  .av { flex:0 0 38px; height:38px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:14px; }
+  .chk { flex:0 0 38px; width:38px; height:38px; border-radius:50%; border:1.5px solid var(--line); background:var(--surface);
+         display:inline-flex; align-items:center; justify-content:center; color:var(--muted); padding:0; }
+  .chk.feito { background:var(--pos); border-color:var(--pos); color:#fff; }
+  .x { border:0; background:none; color:var(--muted); padding:6px; display:inline-flex; flex:0 0 auto; }
+  .tag { display:inline-block; font-size:11px; font-weight:700; border-radius:99px; padding:1px 8px; margin-left:6px;
+         background:var(--brand-soft); color:var(--brand); vertical-align:1px; }
+  .tag.warn { background:var(--warn-soft); color:var(--warn); }
+  .tag.bom { background:var(--pos-soft); color:var(--pos); }
+  .tag.ruim { background:var(--neg-soft); color:var(--neg); }
+
+  input, select { font:inherit; font-size:16px; color:var(--ink); background:var(--surface); border:1px solid var(--line);
+                  border-radius:10px; padding:9px 10px; min-width:0; }
+  input:focus, select:focus { outline:none; border-color:var(--brand); }
+  .inp-pg { flex:0 0 88px; width:88px; text-align:right; padding:8px; }
+  @media (max-width:400px) { .inp-pg { flex-basis:80px; width:80px; } .av { flex-basis:34px; height:34px; } }
+  .btn { border:1px solid var(--line); background:var(--surface); border-radius:12px; padding:11px 16px; font-weight:700; }
+  .btn.prim { background:var(--brand); border-color:var(--brand); color:var(--on-brand); }
+  .btn.full { width:100%; }
+  .btn.sm { padding:7px 12px; font-size:13.5px; border-radius:10px; }
+  .btn.perigo { color:var(--neg); }
+  .vazio { text-align:center; color:var(--muted); padding:22px 8px; font-size:14px; }
+
+  .cat { display:flex; gap:16px; align-items:center; flex-wrap:wrap; margin-top:6px; }
+  .cat svg { width:140px; height:140px; flex:0 0 140px; }
+  .leg { flex:1; min-width:170px; }
+  .leg .l { display:flex; justify-content:space-between; gap:8px; font-size:13.5px; padding:4px 0; }
+  .leg .l span:last-child { color:var(--muted); white-space:nowrap; }
+  .dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:8px; }
+  svg text { fill:var(--muted); font-size:11px; font-family:inherit; }
+  svg text.dv { fill:var(--ink); font-size:15px; font-weight:800; }
+
+  .cc { background:var(--cc); color:#fff; border-radius:20px; padding:18px 18px 16px; margin-bottom:12px; }
+  .cc-top { display:flex; justify-content:space-between; align-items:center; font-size:15px; }
+  .cc .ajuda { color:#fff; opacity:.85; }
+  .cc-label { font-size:13px; opacity:.85; margin-top:18px; }
+  .cc-valor { font-size:30px; font-weight:800; letter-spacing:-1px; }
+  .cc-rodape { font-size:12.5px; opacity:.8; margin-top:10px; }
+  .fat-edit { display:flex; align-items:center; gap:10px; padding:12px 0; border-bottom:1px solid var(--line); }
+  .fat-edit:last-child { border-bottom:0; }
+  .fat-edit .inp-pg { flex-basis:110px; width:110px; }
+
+  .ind { padding:12px 0; border-bottom:1px solid var(--line); }
+  .ind:last-child { border-bottom:0; }
+  .ind-top { display:flex; justify-content:space-between; align-items:baseline; gap:10px; }
+  .ind-val { font-size:22px; font-weight:800; letter-spacing:-.5px; }
+  .evento { display:flex; justify-content:space-between; gap:10px; font-size:13.5px; padding:4px 0; }
+  .evento span:first-child { color:var(--muted); }
+
+  nav.tab { position:fixed; left:0; right:0; bottom:0; z-index:20; background:var(--surface); border-top:1px solid var(--line);
+            display:grid; grid-template-columns:repeat(5,1fr); padding:6px 4px calc(6px + env(safe-area-inset-bottom,0px)); }
+  nav.tab button { border:0; background:none; display:flex; flex-direction:column; align-items:center; gap:2px;
+                   font-size:11px; font-weight:700; color:var(--muted); padding:4px 0; }
+  nav.tab button.on { color:var(--brand); }
+  nav.tab .mais { width:54px; height:54px; border-radius:50%; background:var(--brand); color:var(--on-brand);
+                  display:flex; align-items:center; justify-content:center; margin-top:-24px; box-shadow:0 6px 18px rgba(47,85,212,.35); }
+  @media (min-width:700px) {
+    nav.tab { left:50%; right:auto; width:480px; transform:translateX(-50%); bottom:16px; border:1px solid var(--line); border-radius:22px; }
+  }
+
+  #veu { position:fixed; inset:0; background:rgba(10,12,18,.5); z-index:30; display:none; align-items:flex-end; justify-content:center; }
+  #veu.aberto { display:flex; }
+  #folha { background:var(--surface); width:100%; max-width:560px; border-radius:24px 24px 0 0;
+           padding:10px 18px calc(20px + env(safe-area-inset-bottom,0px)); max-height:92vh; overflow:auto; animation:sobe .22s ease-out; }
+  @media (min-width:700px) { #veu { align-items:center; } #folha { border-radius:24px; } }
+  @keyframes sobe { from { transform:translateY(24px); opacity:.6; } to { transform:none; opacity:1; } }
+  @media (prefers-reduced-motion: reduce) { #folha { animation:none; } }
+  .alca { width:40px; height:4px; border-radius:99px; background:var(--line); margin:0 auto 14px; }
+  .ftit { font-size:19px; margin:0 0 14px; letter-spacing:-.3px; }
+  .bloco h3 { font-size:14px; margin:0 0 4px; color:var(--brand); }
+  .bloco p { margin:0 0 16px; font-size:14.5px; line-height:1.6; }
+  .seg { display:grid; grid-template-columns:repeat(3,1fr); background:var(--soft); border-radius:12px; padding:4px; gap:4px; margin-bottom:16px; }
+  .seg.seg4 { grid-template-columns:repeat(4,1fr); margin-bottom:14px; }
+  .seg button { border:0; background:none; border-radius:9px; padding:9px 0; font-weight:700; color:var(--muted); font-size:14px; }
+  .seg.seg4 button { font-size:13px; }
+  .seg button.on { background:var(--surface); color:var(--ink); box-shadow:0 1px 3px rgba(0,0,0,.12); }
+  .valor-grande { width:100%; font-size:34px; font-weight:800; text-align:center; border:0; border-bottom:2px solid var(--line);
+                  border-radius:0; padding:6px 0 8px; background:none; margin-bottom:16px; }
+  .campo { display:block; margin-bottom:12px; }
+  .campo > span { display:block; font-size:13px; color:var(--muted); margin-bottom:4px; font-weight:600; }
+  .campo input, .campo select { width:100%; }
+  .par { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:10px; }
+  .previa { background:var(--brand-soft); color:var(--brand); border-radius:12px; padding:10px 12px; font-size:13.5px; font-weight:700; margin-bottom:14px; }
+  .dica { color:var(--muted); font-size:13px; margin:0 0 14px; }
+  .check { display:flex; align-items:center; gap:10px; margin-bottom:14px; font-weight:600; }
+  .check input { width:20px; height:20px; }
+  .botoes { display:flex; gap:10px; }
+  .botoes .btn { flex:1; }
+  .sec { font-size:14px; font-weight:800; margin:16px 0 2px; }
+  .dia-cab { display:flex; align-items:center; gap:8px; font-size:13px; font-weight:800; color:var(--muted); margin:14px 0 0; text-transform:none; }
+  .dia-cab:first-child { margin-top:2px; }
+  .dia-cab.hoje { color:var(--brand); }
+  .marco { display:flex; justify-content:space-between; gap:10px; background:var(--pos-soft); color:var(--pos); border-radius:12px;
+           padding:9px 12px; font-size:13.5px; font-weight:700; margin:12px 0 2px; }
+  .item.link { cursor:pointer; }
+  .dt { flex:0 0 44px; height:44px; border-radius:12px; background:var(--soft); display:flex; flex-direction:column; align-items:center; justify-content:center; line-height:1.05; }
+  .dt b { font-size:16px; } .dt small { font-size:10.5px; color:var(--muted); font-weight:700; }
+  .dt.atraso { background:var(--neg-soft); color:var(--neg); } .dt.atraso small { color:var(--neg); }
+  .dt.perto { background:var(--warn-soft); color:var(--warn); } .dt.perto small { color:var(--warn); }
+
+  .sim-res { position:sticky; top:-10px; z-index:2; background:var(--surface); padding:4px 0 12px; margin-bottom:6px; border-bottom:1px solid var(--line); }
+  .sim-grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:8px; }
+  .sim-box { background:var(--soft); border-radius:14px; padding:10px 12px; min-width:0; }
+  .sim-box small { display:block; font-size:12px; color:var(--muted); }
+  .sim-box b { font-size:17px; }
+  .sim-box .sub { font-size:12px; }
+  .sim-box.cheio { grid-column:1 / -1; }
+  .item.fora .nome { text-decoration:line-through; color:var(--muted); }
+  .item input[type=checkbox] { width:22px; height:22px; flex:0 0 22px; }
+
+  #toast { position:fixed; left:50%; bottom:100px; transform:translateX(-50%) translateY(8px); background:var(--ink); color:var(--bg);
+           padding:10px 18px; border-radius:99px; font-size:14px; font-weight:600; opacity:0; transition:all .2s; pointer-events:none; z-index:40; }
+  #toast.show { opacity:1; transform:translateX(-50%); }
+  #toast.err { background:var(--neg); color:#fff; }
+  #busy { position:fixed; top:0; left:0; height:3px; width:0; background:var(--brand); transition:width .4s; z-index:50; }
+</style>
+</head>
+<body>
+<div id="busy"></div>
+<div class="wrap">
+  <header class="top">
+    <div><h1 class="mes" id="titulo">Carregando…</h1><div class="mes-sub" id="subtitulo"></div></div>
+    <div class="acoes">
+      <button class="icbtn" data-act="recarregar" aria-label="Atualizar" id="b-atualizar"></button>
+      <button class="icbtn" data-act="ajustes" aria-label="Ajustes" id="b-ajustes"></button>
+    </div>
+  </header>
+  <main id="app"><div class="vazio">Carregando suas contas…</div></main>
+</div>
+<nav class="tab" id="nav"></nav>
+<div id="veu"><div id="folha" role="dialog" aria-modal="true"></div></div>
+<div id="toast"></div>
+
+<script>
+var D = null, PAG = 'inicio', SUB = 'saude', CSUB = 'contas', AG = 'atual', TIPO = 'Gasto', FOLHA = '', SIM = null, EDIT = null;
+var SEMANA = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+var MES_CURTO = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+var MES_LONGO = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+var COR = { 'Moradia':'#5b6ee1', 'Alimentação':'#e08a2e', 'Transporte':'#c99a12', 'Saúde':'#1f9d74', 'Educação':'#2b9bc4',
+            'Pessoal':'#a35bd6', 'Lazer':'#e05d8a', 'Compras':'#ef7b45', 'Dívidas':'#d64545', 'Dízimo':'#7c8b3a',
+            'Pets':'#6fae3d', 'Reserva':'#0d8f7a', 'Outros':'#8a929c', 'Cartão':'#55607a' };
+var NECESSIDADES = ['Moradia', 'Alimentação', 'Transporte', 'Saúde', 'Educação', 'Dízimo', 'Pets'];
+var FUTURO = ['Reserva', 'Dívidas'];
+var ICO = {
+  inicio: '<path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
+  contas: '<path d="M9 6h12M9 12h12M9 18h12"/><path d="m3 6 1.5 1.5L7 5M3 12l1.5 1.5L7 11M3 18l1.5 1.5L7 17"/>',
+  cartao: '<rect x="2" y="5" width="20" height="14" rx="2.5"/><path d="M2 10h20M6 15h4"/>',
+  planos: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+  agenda: '<rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+  mais: '<path d="M12 5v14M5 12h14"/>',
+  ajustes: '<path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/>',
+  atualizar: '<path d="M21 12a9 9 0 1 1-2.6-6.4L21 8"/><path d="M21 3v5h-5"/>',
+  check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+  x: '<path d="M6 6l12 12M18 6 6 18"/>',
+  entra: '<path d="M17 7 7 17M7 9v8h8"/>',
+  sai: '<path d="M7 17 17 7M9 7h8v8"/>',
+  meta: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>',
+  i: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.8v.01"/>'
+};
+function ico(n, t) {
+  t = t || 20;
+  return '<svg viewBox="0 0 24 24" width="' + t + '" height="' + t + '" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + ICO[n] + '</svg>';
+}
+
+// ---------- textos de ajuda de cada painel ----------
+var INFO = {
+  livre: { t: 'Livre até o salário',
+    m: 'Quanto sobra até o próximo salário se você pagar tudo o que ainda falta neste ciclo. Se o cartão ficar vermelho, o dinheiro não fecha e a diferença vai sair do limite da conta.',
+    c: 'Saldo na conta menos o que falta pagar (contas fixas, faturas e gastos planejados ainda não pagos). O saldo na conta é: saldo antes do salário + salário + entradas extras − tudo o que já foi pago. Valores a receber não entram até você marcar que recebeu. O valor por dia divide o livre pelos dias que faltam até o 1º dia útil do mês seguinte.',
+    a: 'Salário e saldo antes do salário ficam nos Ajustes (engrenagem no topo). O saldo na conta deve bater com o app do banco: se não bater, faltou lançar algum gasto ou entrada.' },
+  salario: { t: 'Salário do próximo mês',
+    m: 'Quanto do próximo salário já tem destino antes mesmo de cair na conta.',
+    c: 'Começa com a sobra (ou a falta) deste ciclo, soma o próximo salário e o que você tem a receber, e desconta as contas fixas do próximo ciclo, a próxima fatura do cartão e os gastos planejados para lá.',
+    a: 'Atualize o valor da próxima fatura na tela Cartão e lance as compras assim que fizer. Contas que mudam de valor ou terminam se ajustam no Cadastro de contas fixas.' },
+  categorias: { t: 'Para onde vai o dinheiro',
+    m: 'Tudo o que sai da conta neste ciclo, separado por categoria.',
+    c: 'Soma as contas fixas (as pagas pelo valor pago, as pendentes pelo valor do mês), os gastos à vista, os planejados e as faturas. A fatura é dividida pelas categorias das compras lançadas; o que passar disso aparece como Cartão.',
+    a: 'A categoria vem do cadastro da conta ou do que você escolhe ao lançar.' },
+  reserva: { t: 'Reserva',
+    m: 'Quanto você já tem guardado e quanto falta para a meta.',
+    c: 'Reserva já guardada antes de dezembro + tudo o que foi pago nas contas do tipo Reserva (Economia e Emergências). A meta é o número de meses escolhido × o custo fixo mensal (as contas fixas que não são reserva).',
+    a: 'Nos Ajustes: Reserva já guardada e Meta da reserva (meses). Para guardar mais por mês, edite Economia ou Emergências no Cadastro de contas fixas.' },
+  movimentos: { t: 'Movimentos do ciclo',
+    m: 'O extrato do ciclo: tudo o que entrou e saiu da sua conta.',
+    c: 'Salário, entradas extras, contas pagas, faturas pagas e gastos à vista. Compras no cartão não aparecem aqui, porque só saem da conta quando a fatura é paga.',
+    a: 'Gastos e entradas lançados errado se apagam no X. Pagamentos de contas e faturas se desfazem tocando no círculo verde, na tela Contas.' },
+  resumo: { t: 'Contas pagas e total',
+    m: 'Quantas contas fixas do ciclo você já pagou, quanto ainda falta pagar e o total previsto do ciclo.',
+    c: 'Usa o valor do mês de cada conta e o valor atual de cada fatura. O que falta pagar soma o que ainda não foi marcado como pago, incluindo gastos planejados.',
+    a: 'Para testar mudanças sem salvar nada, use Simular mudanças.' },
+  faturas: { t: 'Faturas do ciclo',
+    m: 'As faturas de cartão que vencem neste ciclo e precisam sair deste salário.',
+    c: 'Se você informou o valor da fatura, vale esse valor. Se não, vale a soma das compras lançadas que caem nela.',
+    a: 'Digite o valor atual da fatura (o que aparece no app do banco) e saia do campo: ele fica salvo na planilha e todos os totais se atualizam. Repita sempre que a fatura mudar. Para pagar, toque no círculo.' },
+  agenda: { t: 'Agenda de vencimentos',
+    m: 'Tudo o que vence no ciclo, em ordem de data: contas fixas, faturas, planejados e valores a receber, entre um salário e o próximo.',
+    c: 'Contas fixas sempre contam no ciclo do salário que as paga, mesmo quando o vencimento cai no mês seguinte (marcadas com "vence no mês seguinte"). Faturas, planejados e valores a receber entram no ciclo pela data: o que vence antes do 1º dia útil do mês ainda é pago com o salário anterior.',
+    a: 'Toque em qualquer item para mudar a data. Nas contas fixas você escolhe o dia e se ele cai no mês seguinte; nos cartões, os dias de fechamento e vencimento; nos planejados, a data, e o painel move para o ciclo certo sozinho. O círculo marca como pago.' },
+  proxvenc: { t: 'Próximos vencimentos',
+    m: 'As próximas contas, faturas e planejados que ainda não foram pagos neste ciclo, começando pelos atrasados.',
+    c: 'Usa as datas da Agenda. Vermelho é atrasado, âmbar vence em até 3 dias.',
+    a: 'Toque em Ver agenda para ver o ciclo inteiro e editar as datas.' },
+  fixas: { t: 'Contas fixas do ciclo',
+    m: 'As contas que valem neste ciclo, com as pendentes primeiro e em ordem de vencimento. O valor no canto é o total do mês.',
+    c: 'O campo de cada conta é o valor do mês. Ao mudar e sair do campo, o novo valor fica salvo só para este ciclo (o cadastro não muda) e os totais se atualizam. A conta aparece como Ajustada, com o valor padrão embaixo.',
+    a: 'Para voltar ao padrão, digite o valor padrão de novo. Para pagar, toque no círculo; para desfazer, toque no círculo verde. Para mudar o valor de todos os meses, edite no Cadastro.' },
+  planejados: { t: 'Planejados e a receber',
+    m: 'Gastos que você sabe que vão acontecer (IPVA, presente, viagem) e dinheiro que vai entrar (13º, férias, reembolso), lançados antes da hora.',
+    c: 'Planejados deste ciclo entram no que falta pagar. Os de ciclos futuros entram na projeção. Valores a receber só entram no saldo quando você marca como recebido.',
+    a: 'Lance pelo botão +, escolhendo "Vou pagar" ou "Vou receber" e a data de vencimento: o painel coloca no ciclo certo sozinho. Quando acontecer, corrija o valor e toque no círculo. Para mudar a data, toque no item na Agenda.' },
+  dividas: { t: 'Dívidas e parcelamentos',
+    m: 'As contas fixas que têm fim, com quantas parcelas já foram e quanto falta no total.',
+    c: 'Parcelas pagas = ciclos desde o início da conta (mais esta, se já estiver paga). Falta pagar = parcelas restantes × valor da parcela.',
+    a: 'No cadastro da conta, preencha "Começa no ciclo" e "Nº de ciclos". Exemplo: se faltam 5 parcelas a partir de dezembro, coloque dez/2026 e 5.' },
+  cadastro: { t: 'Cadastro de contas fixas',
+    m: 'Todas as contas fixas cadastradas, ativas ou pausadas, com o valor padrão de cada uma.',
+    c: 'Uma conta ativa entra em todos os ciclos a partir de "Começa no ciclo" até acabar o "Nº de ciclos". Com o nº de ciclos vazio, ela não tem fim.',
+    a: 'Toque numa conta para editar: o que você salvar vai direto para a aba Contas da planilha e vale para todos os meses.' },
+  cartao: { t: 'Cartão de crédito',
+    m: 'A fatura que você paga neste ciclo, a próxima e o que já está lançado para os meses seguintes.',
+    c: 'Cada fatura usa o valor que você informou; sem valor informado, usa a soma das compras lançadas. Cada compra cai numa fatura pelo dia em que foi feita, conforme os dias de fechamento e vencimento.',
+    a: 'Atualize o valor da fatura sempre que ela mudar no app do banco: fica salvo na planilha. "Usar soma das compras" apaga o valor informado. Os dias de fechamento e vencimento se mudam em Editar datas do cartão.' },
+  saude: { t: 'Saúde financeira',
+    m: 'Quatro indicadores que mostram se o orçamento está equilibrado, usando referências comuns de educação financeira.',
+    c: 'Custo fixo: contas fixas (sem reserva) ÷ salário; referência até 50%. Dívidas: contas da categoria Dívidas + parcelas de compras parceladas no cartão ÷ salário; referência até 30%. Poupança: o que vai para Economia e Emergências ÷ salário; referência 20% (10% já é bom começo). Reserva: reserva guardada ÷ custo fixo mensal; referência de 3 a 6 meses.',
+    a: 'São referências, não regras. Cortar uma conta fixa melhora dois indicadores de uma vez, porque o corte se repete todo mês.' },
+  regra: { t: 'Divisão 50/30/20',
+    m: 'Como as saídas deste ciclo se dividem em relação ao salário, comparando com a divisão 50/30/20.',
+    c: 'Necessidades (moradia, alimentação, transporte, saúde, educação, dízimo e pets), referência 50%. Desejos (pessoal, lazer, compras, outros e cartão sem detalhe), referência 30%. Futuro (reserva e dívidas), referência 20%. A marca escura em cada barra é a referência.',
+    a: 'A divisão segue a categoria de cada conta e lançamento. Para que a conta encaixe no grupo certo, ajuste a categoria no cadastro ou ao lançar.' },
+  projecao: { t: 'Projeção',
+    m: 'Como o dinheiro livre deve evoluir nos próximos 6 ciclos se tudo seguir como está.',
+    c: 'Parte do livre de hoje. Em cada ciclo soma o salário e o que está a receber, e desconta as contas fixas ativas naquele mês, as faturas já conhecidas (compras parceladas e valores informados) e os planejados. Contas com fim deixam de contar quando acabam.',
+    a: 'Quanto mais você lança (parcelas, planejados, 13º), mais confiável fica. Compras futuras no cartão que ainda não aconteceram não entram, então a projeção tende a ser otimista nas faturas distantes.' },
+  metas: { t: 'Metas',
+    m: 'Objetivos com valor e prazo: viagem, troca de celular, entrada de um carro.',
+    c: 'Falta = valor da meta − guardado. Por mês = falta ÷ ciclos até o prazo, contando o atual.',
+    a: 'Toque em Guardar para somar à meta. Com "Tirar do saldo deste ciclo" marcado, o valor também sai do saldo como um gasto da categoria Reserva. As metas ficam na aba Objetivos da planilha.' },
+  fechar: { t: 'Fechar o ciclo',
+    m: 'Encerra o ciclo atual, grava o resumo no Histórico e abre o próximo.',
+    c: 'Fica gravado só o que foi pago de verdade. O saldo final vira o saldo inicial do próximo ciclo. Contas e planejados não pagos não passam para o ciclo seguinte.',
+    a: 'Feche no último dia antes do salário cair. Se fechar sem querer, apague a linha do ciclo na aba Histórico e volte o "Ciclo aberto" na aba Config.' },
+  historico: { t: 'Ciclos fechados',
+    m: 'O resumo de cada ciclo que você já fechou.',
+    c: 'Resultado = salário + entradas extras − contas fixas − faturas − gastos à vista. Saldo final = saldo inicial + resultado.',
+    a: 'Os números vêm dos lançamentos. Para corrigir um ciclo já fechado, ajuste direto nas abas da planilha.' }
+};
+
+// ---------- utilidades ----------
+var FMT = new Intl.NumberFormat('pt-BR', { style:'currency', currency:'BRL' });
+function brl(n) { return FMT.format(Number(n) || 0); }
+function sinal(n) { return (n > 0 ? '+' : '') + brl(n); }
+function pctTxt(n) { return Math.round(n * 100) + '%'; }
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]; }); }
+function dec(n) { return n === '' || n == null ? '' : Number(n).toFixed(2).replace('.', ','); }
+function cap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : ''; }
+function cor(c) { return COR[c] || COR['Outros']; }
+function val(id) { var e = document.getElementById(id); return e ? e.value : ''; }
+function parse(s) {
+  s = String(s).replace(/R\$|\s/g, '');
+  if (s === '') return '';
+  if (s.indexOf(',') >= 0) s = s.replace(/\./g, '').replace(',', '.');
+  var n = Number(s);
+  return isNaN(n) ? NaN : n;
+}
+function opts(lista, atual) {
+  return lista.map(function (o) {
+    var v = Array.isArray(o) ? o[0] : o, t = Array.isArray(o) ? o[1] : o;
+    return '<option value="' + esc(v) + '"' + (String(v) === String(atual) ? ' selected' : '') + '>' + esc(t) + '</option>';
+  }).join('');
+}
+function somaC(k, n) { var p = k.split('-').map(Number), t = p[0] * 12 + (p[1] - 1) + n; return Math.floor(t / 12) + '-' + String(t % 12 + 1).padStart(2, '0'); }
+function difC(a, b) { var pa = a.split('-').map(Number), pb = b.split('-').map(Number); return (pb[0] - pa[0]) * 12 + (pb[1] - pa[1]); }
+function nomeC(k) { var p = k.split('-'); return MES_CURTO[Number(p[1]) - 1] + '/' + p[0]; }
+function longoC(k) { return MES_LONGO[Number(k.split('-')[1]) - 1]; }
+function avatar(nome, cat) {
+  var c = cor(cat);
+  return '<span class="av" style="background:' + c + '22;color:' + c + '">' + esc(String(nome).charAt(0).toUpperCase()) + '</span>';
+}
+function linha(rotulo, v, classe) {
+  return '<div class="linha' + (classe === 'total' ? ' total' : '') + '"><span class="k">' + rotulo + '</span><b class="num ' +
+    (classe === 'cor' || classe === 'total' ? (v < 0 ? 'v-neg' : '') : '') + '">' + brl(v) + '</b></div>';
+}
+function ajuda(k) { return '<button class="ajuda" data-act="ajuda" data-k="' + k + '" aria-label="Entender este painel">' + ico('i', 19) + '</button>'; }
+function cab(titulo, sub, chave, dir) {
+  return '<div class="ph"><div class="ph-txt"><h2>' + titulo + '</h2>' + (sub ? '<div class="sub">' + sub + '</div>' : '') + '</div>' +
+    '<div class="ph-dir">' + (dir || '') + (chave ? ajuda(chave) : '') + '</div></div>';
+}
+
+// ---------- datas pela ótica do salário (mesmas regras do servidor) ----------
+function pad2(n) { return String(n).padStart(2, '0'); }
+function diaUtil(k) {
+  var p = k.split('-').map(Number);
+  for (var d = 1; d <= 7; d++) { var s = new Date(Date.UTC(p[0], p[1] - 1, d)).getUTCDay(); if (s !== 0 && s !== 6) return k + '-' + pad2(d); }
+}
+function dataNoMes(k, dia) {
+  var p = k.split('-').map(Number), ultimo = new Date(Date.UTC(p[0], p[1], 0)).getUTCDate();
+  return k + '-' + pad2(Math.min(Math.max(1, dia), ultimo));
+}
+function cicloDaData(iso) { var k = iso.slice(0, 7); return iso < diaUtil(k) ? somaC(k, -1) : k; }
+function dataConta(k, dia, seguinte) { return dia ? dataNoMes(seguinte ? somaC(k, 1) : k, dia) : ''; }
+function difDias(a, b) {
+  var pa = a.split('-').map(Number), pb = b.split('-').map(Number);
+  return Math.round((Date.UTC(pb[0], pb[1] - 1, pb[2]) - Date.UTC(pa[0], pa[1] - 1, pa[2])) / 86400000);
+}
+function ddmm(iso) { return iso ? iso.slice(8, 10) + '/' + iso.slice(5, 7) : ''; }
+function semana(iso) { var p = iso.split('-').map(Number); return SEMANA[new Date(Date.UTC(p[0], p[1] - 1, p[2])).getUTCDay()]; }
+
+// Em qual ciclo a compra no cartão será paga.
+function cicloCompra(iso, k) {
+  var p = iso.split('-').map(Number), mes = p[0] + '-' + pad2(p[1]);
+  if (!k || !k.fech || !k.venc) return somaC(mes, 1);
+  var fecha = p[2] <= k.fech ? mes : somaC(mes, 1);
+  var mesVenc = k.venc > k.fech ? fecha : somaC(fecha, 1);
+  return cicloDaData(dataNoMes(mesVenc, k.venc));
+}
+
+var toastT;
+function toast(msg, err) {
+  var t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'show' + (err ? ' err' : '');
+  clearTimeout(toastT); toastT = setTimeout(function () { t.className = ''; }, err ? 5000 : 1600);
+}
+function busy(on) { document.getElementById('busy').style.width = on ? '70%' : '0'; }
+
+// ---------- comunicação com o servidor (API do Apps Script) ----------
+// A URL e a chave ficam só neste aparelho (nunca no GitHub).
+// Etapa 1, passo 4: elas passam a ficar criptografadas pelo PIN.
+var CX_CHAVE = 'wrkz_conexao';
+function conexao() {
+  try { return JSON.parse(localStorage.getItem(CX_CHAVE) || 'null'); } catch (e) { return null; }
+}
+function apiCom(cx, fn, args) {
+  // Sem cabeçalho Content-Type de propósito: assim o navegador manda como texto simples e o Apps Script aceita.
+  return fetch(cx.url, { method: 'POST', redirect: 'follow', body: JSON.stringify({ chave: cx.chave, fn: fn, args: args || [] }) })
+    .then(function (r) { if (!r.ok) throw new Error('O servidor respondeu com erro ' + r.status + '.'); return r.json(); })
+    .then(function (j) {
+      if (!j.ok) { var e = new Error(j.erro || 'Erro no servidor.'); e.chave = j.erro === 'Chave inválida.'; throw e; }
+      return j.dados;
+    });
+}
+function api(fn, args) {
+  var cx = conexao();
+  if (!cx) return Promise.reject(new Error('Este aparelho ainda não está conectado.'));
+  return apiCom(cx, fn, args);
+}
+function falha(e) {
+  if (e.chave) { toast('A chave foi recusada. Confira a conexão.', true); telaConexao(); return; }
+  toast(navigator.onLine ? 'Erro: ' + e.message : 'Sem internet. Tente de novo quando conectar.', true);
+  if (!D) document.getElementById('app').innerHTML = '<div class="vazio">Não foi possível carregar suas contas.<br>' +
+    '<button class="btn" data-act="recarregar" style="margin-top:12px">Tentar de novo</button></div>';
+}
+function load() {
+  if (!conexao()) { telaConexao(); return; }
+  busy(true);
+  api('getDados')
+    .then(function (d) { busy(false); D = d; render(); atalho(); })
+    .catch(function (e) { busy(false); falha(e); });
+}
+function call(fn) {
+  var args = Array.prototype.slice.call(arguments, 1);
+  busy(true);
+  api(fn, args)
+    .then(function (d) {
+      busy(false); D = d;
+      if (FOLHA === 'ajustes') folhaAjustes(); else fecharFolha();
+      render(); toast('Salvo');
+    })
+    .catch(function (e) { busy(false); if (e.chave) { falha(e); return; } toast(e.message, true); load(); });
+}
+
+// ---------- conexão deste aparelho ----------
+function telaConexao() {
+  var cx = conexao();
+  fecharFolha();
+  document.getElementById('titulo').textContent = 'Conectar';
+  document.getElementById('subtitulo').textContent = 'Ligue este aparelho à sua planilha';
+  document.getElementById('nav').innerHTML = '';
+  document.getElementById('app').innerHTML =
+    '<div class="painel">' +
+    '<p class="dica">Cole aqui a URL da implantação "API app" (termina em /exec) e a chave secreta que o gerarChave() mostrou. ' +
+    'As duas ficam guardadas só neste aparelho.</p>' +
+    '<label class="campo"><span>URL da API</span><input id="cx-url" type="url" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" ' +
+    'placeholder="https://script.google.com/macros/s/…/exec" value="' + esc(cx ? cx.url : '') + '"></label>' +
+    '<label class="campo"><span>Chave secreta</span><input id="cx-chave" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" ' +
+    'placeholder="Cole a chave"></label>' +
+    '<button class="btn prim full" data-act="cx-salvar">Testar e conectar</button>' +
+    (cx ? '<div class="botoes" style="margin-top:10px"><button class="btn" data-act="recarregar">Voltar</button>' +
+          '<button class="btn perigo" data-act="cx-sair">Desconectar</button></div>' : '') +
+    '</div>';
+}
+function salvarConexao() {
+  var url = val('cx-url').trim(), chave = val('cx-chave').trim();
+  if (!/^https:\/\/script\.google\.com\/.+\/exec$/.test(url)) { toast('A URL precisa começar com https://script.google.com e terminar em /exec', true); return; }
+  if (chave.length < 20) { toast('Cole a chave completa', true); return; }
+  busy(true);
+  apiCom({ url: url, chave: chave }, 'ping')
+    .then(function () {
+      busy(false);
+      localStorage.setItem(CX_CHAVE, JSON.stringify({ url: url, chave: chave }));
+      toast('Conectado'); D = null; load();
+    })
+    .catch(function (e) { busy(false); toast(e.chave ? 'Chave recusada. Confira e cole de novo.' : 'Não conectou: ' + e.message, true); });
+}
+function sairConexao() {
+  if (!confirm('Desconectar este aparelho? A URL e a chave serão apagadas daqui. A planilha não muda.')) return;
+  localStorage.removeItem(CX_CHAVE); D = null; telaConexao();
+}
+
+// ---------- atalhos do ícone (segurar o ícone do app) ----------
+var ATALHO_FEITO = false;
+function atalho() {
+  if (ATALHO_FEITO) return;
+  ATALHO_FEITO = true;
+  var p = new URLSearchParams(location.search), acao = p.get('acao'), pag = p.get('pag');
+  if (acao || pag) history.replaceState(null, '', location.pathname);
+  if (pag && PAGINAS[pag]) { PAG = pag; render(); }
+  if (acao === 'gasto') folhaLancar('Gasto');
+  if (acao === 'cartao') folhaLancar('Cartão');
+  if (acao === 'entrada') folhaLancar('Entrada');
+}
+
+document.addEventListener('click', function (ev) {
+  var t = ev.target.closest && ev.target.closest('[data-act]');
+  if (!t) return;
+  var act = t.getAttribute('data-act');
+  if (act === 'cx-salvar') salvarConexao();
+  if (act === 'cx-sair') sairConexao();
+  if (act === 'conexao') telaConexao();
+});
+
+// ---------- tela ----------
+var NAV = [['inicio', 'Início'], ['contas', 'Contas'], ['mais', ''], ['agenda', 'Agenda'], ['planos', 'Planos']];
+var PAGINAS = { inicio: pgInicio, contas: pgPagar, agenda: pgAgenda, planos: pgPlanos };
+
+function render() {
+  document.getElementById('titulo').textContent = cap(D.ciclo.mes);
+  document.getElementById('subtitulo').textContent = 'Ciclo do salário de ' + D.ciclo.inicio + ' até ' + D.ciclo.proxSalario;
+  document.getElementById('nav').innerHTML = NAV.map(function (n) {
+    if (n[0] === 'mais') return '<button data-act="lancar" aria-label="Novo lançamento"><span class="mais">' + ico('mais', 26) + '</span></button>';
+    return '<button data-act="ir" data-pag="' + n[0] + '"' + (n[0] === PAG ? ' class="on" aria-current="page"' : '') + '>' + ico(n[0], 22) + '<span>' + n[1] + '</span></button>';
+  }).join('');
+  document.getElementById('app').innerHTML = PAGINAS[PAG]();
+}
+
+// ----- Início -----
+function pgInicio() {
+  var d = D, alerta = d.livre < 0;
+  var andado = Math.max(0, Math.min(100, (1 - d.ciclo.dias / d.ciclo.diasTotal) * 100));
+  var frase = d.porDia > 0 ? 'Dá para gastar ' + brl(d.porDia) + ' por dia'
+            : alerta ? 'Faltam ' + brl(-d.livre) + ' para pagar tudo' : 'Sem folga para gastos neste ciclo';
+  if (d.aReceber > 0) frase += '. Mais ' + brl(d.aReceber) + ' a receber';
+
+  var h = '<section class="hero' + (alerta ? ' alerta' : '') + '">' +
+    '<div class="hero-top"><span class="hero-tit">Livre até o salário' + ajuda('livre') + '</span><span class="chip">' + d.ciclo.dias + (d.ciclo.dias === 1 ? ' dia' : ' dias') + '</span></div>' +
+    '<div class="big num">' + brl(d.livre) + '</div><div class="hero-sub">' + frase + '</div>' +
+    '<div class="regua"><div class="trilho"><span style="width:' + andado + '%"></span><i style="left:' + andado + '%"></i></div>' +
+    '<div class="regua-leg"><span>Salário ' + d.ciclo.inicio + '</span><span>Próximo ' + d.ciclo.proxSalario + '</span></div></div>' +
+    '<div class="hero-grid"><div><small>Saldo na conta</small><b class="num">' + brl(d.saldoAgora) + '</b></div>' +
+    '<div><small>Falta pagar</small><b class="num">' + brl(d.faltaPagar) + '</b></div></div></section>';
+
+  if (d.limiteUsado > 0) {
+    h += '<div class="aviso neg">Você está usando ' + brl(d.limiteUsado) + ' do limite da conta.' +
+      (d.limite ? ' Ainda restam ' + brl(d.limiteDisponivel) + ' de limite.' : '') + '</div>';
+  } else if (alerta) {
+    h += '<div class="aviso warn">Pagando o que falta, a conta termina o ciclo em ' + brl(d.livre) + '. Essa diferença vai sair do limite.</div>';
+  }
+
+  var p = d.proximo, compr = p.fixas + p.cartao + p.planejados, pct = p.salario ? Math.min(1, compr / p.salario) : 0;
+  h += '<div class="cols"><div>';
+  h += '<div class="painel">' + cab('Salário de ' + p.mes, 'Quanto dele já tem destino', 'salario') +
+    '<div class="barra"><span style="width:' + (pct * 100) + '%;background:var(--warn)"></span><span style="flex:1;background:var(--brand)"></span></div>' +
+    '<div class="sub" style="margin-bottom:6px">' + pctTxt(pct) + ' do próximo salário já está comprometido</div>' +
+    linha((p.sobra >= 0 ? 'Sobra de ' : 'Falta de ') + d.ciclo.mes, p.sobra, 'cor') +
+    linha('Salário', p.salario) +
+    (p.extras ? linha('A receber em ' + p.mes, p.extras) : '') +
+    linha('Contas fixas de ' + p.mes, -p.fixas) +
+    linha('Fatura do cartão em ' + p.mes, -p.cartao) +
+    (p.planejados ? linha('Planejados para ' + p.mes, -p.planejados) : '') +
+    linha('Livre em ' + p.mes, p.livre, 'total') + '</div>';
+  h += '<div class="painel">' + cab('Para onde vai o dinheiro', 'Saídas de ' + d.ciclo.mes, 'categorias') + donut(d.categorias) + '</div>';
+  h += cardReserva() + '</div><div>';
+  var pend = itensAgenda('atual').filter(function (i) { return !i.ok && i.data && i.tipo !== 'receber'; })
+    .sort(function (a, b) { return a.data < b.data ? -1 : a.data > b.data ? 1 : 0; });
+  h += '<div class="painel">' + cab('Próximos vencimentos', pend.length ? 'Ainda não pagos em ' + d.ciclo.mes : '', 'proxvenc') +
+    (pend.length ? pend.slice(0, 4).map(function (i) { return itemAgenda(i, true, true); }).join('') : '<div class="vazio">Tudo com data neste ciclo já foi pago.</div>') +
+    '<button class="btn full" style="margin-top:10px" data-act="ir" data-pag="agenda">Ver agenda</button></div>';
+  var movs = d.extrato.concat([{ desc: 'Salário', data: d.ciclo.inicio, valor: d.salario, tipo: 'Entrada', entrada: true, removivel: false }]);
+  h += '<div class="painel">' + cab('Movimentos de ' + d.ciclo.mes, 'O que entrou e saiu da conta', 'movimentos') + movs.map(itemMov).join('') + '</div>';
+  return h + '</div></div>';
+}
+
+function itemMov(m) {
+  var rot = { 'Conta fixa': 'Paga em ', 'Fatura': 'Paga em ', 'Gasto': 'Gasto em ', 'Entrada': 'Recebido em ' }[m.tipo] || '';
+  var e = m.entrada;
+  return '<div class="item"><span class="av" style="background:' + (e ? 'var(--pos-soft)' : 'var(--soft)') + ';color:' + (e ? 'var(--pos)' : 'var(--muted)') + '">' + ico(e ? 'entra' : 'sai', 18) + '</span>' +
+    '<div class="info"><div class="nome">' + esc(m.desc) + '</div><div class="sub">' + rot + m.data + (m.tipo === 'Gasto' && m.categoria ? ', ' + esc(m.categoria) : '') + '</div></div>' +
+    '<div class="valor num' + (e ? ' v-pos' : '') + '">' + (e ? '+ ' : '− ') + brl(m.valor) + '</div>' +
+    (m.removivel ? '<button class="x" data-act="lexc" data-linha="' + m.linha + '" aria-label="Excluir">' + ico('x', 16) + '</button>' : '') + '</div>';
+}
+
+function cardReserva() {
+  var r = D.reserva;
+  return '<div class="painel">' + cab('Reserva', 'Meta de ' + r.meses + ' meses de custo fixo', 'reserva', '<b class="num">' + brl(r.hoje) + '</b>') +
+    '<div class="barra"><span style="width:' + (r.pct * 100) + '%;background:var(--pos)"></span></div>' +
+    '<div class="sub">' + (r.pct >= 1 ? 'Meta atingida' : pctTxt(r.pct) + ' de ' + brl(r.alvo)) + '</div></div>';
+}
+
+function donut(t) {
+  var itens = Object.keys(t).filter(function (k) { return t[k] > 0; })
+    .map(function (k) { return { nome: k, valor: t[k] }; })
+    .sort(function (a, b) { return b.valor - a.valor; });
+  var tot = itens.reduce(function (s, i) { return s + i.valor; }, 0);
+  if (!tot) return '<div class="vazio">Nenhuma saída neste ciclo.</div>';
+  var R = 52, C = 2 * Math.PI * R, off = 0;
+  var s = '<svg viewBox="0 0 140 140" role="img" aria-label="Saídas por categoria"><circle cx="70" cy="70" r="' + R + '" fill="none" stroke="var(--soft)" stroke-width="18"/>';
+  itens.forEach(function (i) {
+    var len = i.valor / tot * C;
+    s += '<circle cx="70" cy="70" r="' + R + '" fill="none" stroke="' + cor(i.nome) + '" stroke-width="18" stroke-dasharray="' + len + ' ' + (C - len) +
+      '" stroke-dashoffset="' + (-off) + '" transform="rotate(-90 70 70)"/>';
+    off += len;
+  });
+  s += '<text x="70" y="64" text-anchor="middle">Total</text><text class="dv" x="70" y="84" text-anchor="middle">' + Math.round(tot).toLocaleString('pt-BR') + '</text></svg>';
+  return '<div class="cat">' + s + '<div class="leg">' + itens.map(function (i) {
+    return '<div class="l"><span><span class="dot" style="background:' + cor(i.nome) + '"></span>' + esc(i.nome) + '</span><span class="num">' +
+      brl(i.valor) + ' (' + Math.round(i.valor / tot * 100) + '%)</span></div>';
+  }).join('') + '</div></div>';
+}
+
+// ----- Contas (contas fixas e cartão) -----
+function pgPagar() {
+  var h = '<div class="seg" style="grid-template-columns:repeat(2,1fr)">' + [['contas', 'Contas do mês'], ['cartao', 'Cartão']].map(function (a) {
+    return '<button data-act="csub" data-s="' + a[0] + '"' + (CSUB === a[0] ? ' class="on"' : '') + '>' + a[1] + '</button>';
+  }).join('') + '</div>';
+  return h + (CSUB === 'cartao' ? pgCartao() : pgContas());
+}
+
+function pgContas() {
+  var f = D.fixas, pagas = f.filter(function (c) { return c.ok; }).length, tot = D.totais;
+  var h = '<div class="painel">' + cab(pagas + ' de ' + f.length + ' contas pagas', 'Falta pagar ' + brl(D.faltaPagar) + ' neste ciclo', 'resumo') +
+    '<div class="barra"><span style="width:' + (f.length ? pagas / f.length * 100 : 0) + '%;background:var(--pos)"></span></div>' +
+    linha('Contas fixas', tot.fixasPrevisto) + (D.faturas.length ? linha('Faturas do cartão', tot.faturasPrevisto) : '') +
+    (tot.planejados ? linha('Planejados', tot.planejados) : '') +
+    linha('Total previsto do ciclo', tot.fixasPrevisto + tot.faturasPrevisto + tot.planejados, 'total') +
+    '<button class="btn full" style="margin-top:12px" data-act="simular">Simular mudanças</button></div>';
+
+  h += '<div class="cols"><div>';
+  if (D.faturas.length) {
+    h += '<div class="painel">' + cab('Faturas de ' + D.ciclo.mes, 'Digite o valor atual da fatura', 'faturas') + D.faturas.map(function (ft) {
+      var origem = ft.informado !== null ? 'Valor informado' + (ft.lancado ? ', compras lançadas ' + brl(ft.lancado) : '') : 'Soma de ' + ft.qtd + (ft.qtd === 1 ? ' compra lançada' : ' compras lançadas');
+      var info = '<div class="info"><div class="nome">Fatura ' + esc(ft.nome) + '</div><div class="sub">' + (ft.venc ? 'Vence ' + ddmm(ft.venc) + '. ' : '') + origem + '</div></div>';
+      var av = '<span class="av" style="background:var(--brand-soft);color:var(--brand)">' + ico('cartao', 18) + '</span>';
+      if (ft.ok) return '<div class="item ok">' + av + info + '<div class="valor num">' + brl(ft.pago) + '</div>' +
+        '<button class="chk feito" data-act="desfazerFat" data-id="' + ft.id + '" data-nome="Fatura ' + esc(ft.nome) + '" aria-label="Desfazer pagamento">' + ico('check', 18) + '</button></div>';
+      return '<div class="item">' + av + info + '<input class="inp-pg num" id="ft-' + ft.id + '" data-act="aj-fatura" data-id="' + ft.id + '" data-ciclo="' + D.ciclo.chave +
+        '" inputmode="decimal" value="' + dec(ft.previsto) + '" aria-label="Valor da fatura">' +
+        '<button class="chk" data-act="pagarFat" data-id="' + ft.id + '" aria-label="Marcar como paga">' + ico('check', 18) + '</button></div>';
+    }).join('') + '</div>';
+  }
+
+  var lista = f.slice().sort(function (a, b) { return (a.ok - b.ok) || ((a.venc || '9') < (b.venc || '9') ? -1 : (a.venc || '9') > (b.venc || '9') ? 1 : 0) || a.nome.localeCompare(b.nome); });
+  h += '<div class="painel">' + cab('Contas fixas de ' + D.ciclo.mes, 'Mude o valor do mês ou toque no círculo para pagar', 'fixas', '<b class="num">' + brl(tot.fixasPrevisto) + '</b>') +
+    (lista.length ? lista.map(function (c) {
+    var info = '<div class="info"><div class="nome">' + esc(c.nome) + (c.tipo === 'Reserva' ? '<span class="tag">Reserva</span>' : '') +
+      (c.ajustado && !c.ok ? '<span class="tag warn">Ajustada</span>' : '') + '</div>' +
+      '<div class="sub">' + (c.ajustado ? 'Padrão ' + brl(c.padrao) : esc(c.categoria)) + (c.venc ? ', vence ' + ddmm(c.venc) : '') + '</div></div>';
+    if (c.ok) {
+      var dif = c.pago - c.padrao;
+      return '<div class="item ok">' + avatar(c.nome, c.categoria) + info + '<div class="valor num">' + brl(c.pago) +
+        (Math.abs(dif) > 0.004 ? '<div class="sub ' + (dif > 0 ? 'v-neg' : 'v-pos') + '">' + sinal(dif) + '</div>' : '') + '</div>' +
+        '<button class="chk feito" data-act="desfazer" data-id="' + c.id + '" data-nome="' + esc(c.nome) + '" aria-label="Desfazer pagamento">' + ico('check', 18) + '</button></div>';
+    }
+    return '<div class="item">' + avatar(c.nome, c.categoria) + info + '<input class="inp-pg num" id="pg-' + c.id + '" data-act="aj-conta" data-id="' + c.id +
+      '" inputmode="decimal" value="' + dec(c.previsto) + '" aria-label="Valor do mês">' +
+      '<button class="chk" data-act="pagar" data-id="' + c.id + '" aria-label="Marcar como paga">' + ico('check', 18) + '</button></div>';
+  }).join('') : '<div class="vazio">Nenhuma conta ativa neste ciclo.</div>') + '</div>';
+
+  if (D.planejados.length || D.recebiveis.length) {
+    var itemPl = function (p, receber) {
+      return '<div class="item">' + (receber ? '<span class="av" style="background:var(--pos-soft);color:var(--pos)">' + ico('entra', 18) + '</span>' : avatar(p.desc, p.categoria)) +
+        '<div class="info"><div class="nome">' + esc(p.desc) + '</div><div class="sub">' + (receber ? 'A receber' : 'Planejado, ' + esc(p.categoria || 'Outros')) + '</div></div>' +
+        '<input class="inp-pg num" id="pl-' + p.linha + '" inputmode="decimal" value="' + dec(p.valor) + '" aria-label="Valor">' +
+        '<button class="chk" data-act="efetivar" data-linha="' + p.linha + '" aria-label="' + (receber ? 'Marcar como recebido' : 'Marcar como pago') + '">' + ico('check', 18) + '</button>' +
+        '<button class="x" data-act="lexc" data-linha="' + p.linha + '" aria-label="Excluir">' + ico('x', 16) + '</button></div>';
+    };
+    h += '<div class="painel">' + cab('Planejados e a receber', 'Deste ciclo', 'planejados') +
+      D.planejados.map(function (p) { return itemPl(p, false); }).join('') +
+      D.recebiveis.map(function (p) { return itemPl(p, true); }).join('') + '</div>';
+  }
+  h += '</div><div>';
+
+  if (D.dividas.length) {
+    h += '<div class="painel">' + cab('Dívidas e parcelamentos', '', 'dividas') + D.dividas.map(function (dv) {
+      return '<div class="item">' + avatar(dv.nome, 'Dívidas') + '<div class="info"><div class="nome">' + esc(dv.nome) +
+        (dv.faltam === 0 ? '<span class="tag">Quitada</span>' : '') + '</div>' +
+        '<div class="barra"><span style="width:' + (dv.pagas / dv.meses * 100) + '%;background:var(--pos)"></span></div>' +
+        '<div class="sub">' + dv.pagas + ' de ' + dv.meses + ' parcelas, termina em ' + dv.fim + '</div></div>' +
+        '<div class="valor num">' + brl(dv.totalFalta) + '</div></div>';
+    }).join('') + '</div>';
+  }
+
+  h += '<div class="painel">' + cab('Cadastro de contas fixas', 'Valor padrão de todos os meses', 'cadastro') +
+    D.contas.map(function (c) {
+      return '<button class="item" data-act="editar" data-id="' + c.id + '">' + avatar(c.nome, c.categoria) +
+        '<div class="info"><div class="nome">' + esc(c.nome) + (!c.ativa ? '<span class="tag warn">Pausada</span>' : '') + '</div>' +
+        '<div class="sub">' + esc(c.categoria) + (c.meses !== '' ? ', ' + c.meses + ' ciclos desde ' + nomeC(c.inicio) : '') + '</div></div>' +
+        '<div class="valor num">' + brl(c.valor) + '</div></button>';
+    }).join('') +
+    '<button class="btn full" style="margin-top:12px" data-act="editar" data-id="">Nova conta fixa</button></div>';
+  return h + '</div></div>';
+}
+
+// ----- Cartão -----
+function pgCartao() {
+  if (!D.cartoes.length) return '<div class="painel vazio">Cadastre seus cartões na aba Cartões da planilha, com os dias de fechamento e vencimento.</div>';
+  var h = '<div class="cols">';
+  D.cartoes.forEach(function (k) {
+    var a = k.atual, pr = k.proxima;
+    h += '<div><div class="cc"><div class="cc-top"><b>' + esc(k.nome) + '</b>' + ajuda('cartao') + '</div>' +
+      '<div class="cc-label">Fatura paga em ' + D.ciclo.mes + (a.ok ? ' (já paga)' : '') + '</div>' +
+      '<div class="cc-valor num">' + brl(a.ok ? a.pago : a.previsto) + '</div>' +
+      '<div class="cc-rodape">Fecha dia ' + (k.fech || '?') + ' e vence dia ' + (k.venc || '?') + (a.venc ? '. Esta fatura vence ' + ddmm(a.venc) : '') + '</div>' +
+      '<button class="btn sm" style="margin-top:12px" data-act="cartao-datas" data-id="' + k.id + '">Editar datas do cartão</button></div>';
+
+    var editor = function (rotulo, f, ciclo, idCampo) {
+      var origem = f.informado !== null ? 'Valor informado. Compras lançadas: ' + brl(f.lancado) : 'Soma das compras lançadas';
+      return '<div class="fat-edit"><div class="info"><div class="nome">' + rotulo + '</div><div class="sub">' + origem + '</div>' +
+        (f.informado !== null ? '<button class="btn sm" style="margin-top:6px" data-act="limpar-fat" data-id="' + k.id + '" data-ciclo="' + ciclo + '">Usar soma das compras</button>' : '') + '</div>' +
+        '<input class="inp-pg num" id="' + idCampo + '" data-act="aj-fatura" data-id="' + k.id + '" data-ciclo="' + ciclo + '" inputmode="decimal" value="' + dec(f.previsto) + '" aria-label="Valor da fatura"></div>';
+    };
+    h += '<div class="painel">' + cab('Valor das faturas', 'Digite o valor do app do banco e saia do campo', '') +
+      (a.ok ? linha('Fatura de ' + D.ciclo.mes + ' (paga)', a.pago) : editor('Fatura de ' + D.ciclo.mes, a, D.ciclo.chave, 'fa-' + k.id)) +
+      editor('Próxima fatura (' + D.proximo.mes + ')', pr, D.proximo.chave, 'fp-' + k.id) +
+      linha('Já lançado para depois de ' + D.proximo.mes, k.depois) + '</div>';
+
+    h += '<div class="painel">' + cab('Compras lançadas', 'Deste ciclo em diante', '') +
+      (k.compras.length ? k.compras.map(function (c) {
+        return '<div class="item">' + avatar(c.desc, c.categoria) + '<div class="info"><div class="nome">' + esc(c.desc) + '</div>' +
+          '<div class="sub">Compra em ' + c.data + ', paga em ' + c.ciclo + (c.parcela ? ', parcela ' + c.parcela : '') + '</div></div>' +
+          '<div class="valor num">' + brl(c.valor) + '</div>' +
+          '<button class="x" data-act="lexc" data-linha="' + c.linha + '" data-parc="' + (c.parcela ? 1 : 0) + '" aria-label="Excluir">' + ico('x', 16) + '</button></div>';
+      }).join('') : '<div class="vazio">Nenhuma compra lançada.</div>') +
+      '<button class="btn prim full" style="margin-top:12px" data-act="lancar" data-t="Cartão">Lançar compra no cartão</button></div></div>';
+  });
+  return h + '</div>';
+}
+
+// ----- Agenda -----
+function itensAgenda(qual) {
+  var a = qual === 'atual' ? { fixas: D.fixas, faturas: D.faturas, planejados: D.planejados, recebiveis: D.recebiveis } : D.prox;
+  var itens = [];
+  a.fixas.forEach(function (c) { itens.push({ tipo: 'conta', id: c.id, nome: c.nome, valor: c.ok ? c.pago : c.previsto, data: c.venc, ok: c.ok, cat: c.categoria, seguinte: c.mesSeguinte }); });
+  a.faturas.forEach(function (f) { itens.push({ tipo: 'fatura', id: f.id, nome: 'Fatura ' + f.nome, valor: f.ok ? f.pago : f.previsto, data: f.venc, ok: f.ok, cat: 'Cartão' }); });
+  a.planejados.forEach(function (p) { itens.push({ tipo: 'planejado', linha: p.linha, nome: p.desc, valor: p.valor, data: p.iso, ok: false, cat: p.categoria || 'Outros' }); });
+  a.recebiveis.forEach(function (p) { itens.push({ tipo: 'receber', linha: p.linha, nome: p.desc, valor: p.valor, data: p.iso, ok: false, cat: '' }); });
+  return itens;
+}
+
+function situacao(it, atual) {
+  if (it.ok) return { txt: it.tipo === 'receber' ? 'Recebido' : 'Paga', cls: 'bom', dt: '' };
+  if (!it.data) return { txt: 'Sem data', cls: '', dt: '' };
+  var d = difDias(D.hoje, it.data);
+  if (atual && d < 0) return { txt: 'Atrasada há ' + (-d) + (d === -1 ? ' dia' : ' dias'), cls: 'ruim', dt: 'atraso' };
+  if (d === 0) return { txt: 'Vence hoje', cls: 'warn', dt: 'perto' };
+  if (d > 0 && d <= 3) return { txt: 'Vence em ' + d + (d === 1 ? ' dia' : ' dias'), cls: 'warn', dt: 'perto' };
+  return { txt: d > 0 ? 'Vence em ' + d + ' dias' : 'Venceu', cls: '', dt: '' };
+}
+
+function itemAgenda(it, atual, comData) {
+  var s = situacao(it, atual), receber = it.tipo === 'receber';
+  var mesCiclo = atual ? D.ciclo.mes : D.proximo.mes;
+  var sub = s.txt + (it.seguinte ? ', vence no mês seguinte e é paga com o salário de ' + mesCiclo : '') +
+    ({ planejado: ', planejado', receber: ', a receber' }[it.tipo] || '');
+  var lado = comData && it.data ? '<span class="dt ' + s.dt + '"><b>' + it.data.slice(8, 10) + '</b><small>' + MES_CURTO[Number(it.data.slice(5, 7)) - 1] + '</small></span>'
+           : (receber ? '<span class="av" style="background:var(--pos-soft);color:var(--pos)">' + ico('entra', 18) + '</span>'
+           : it.tipo === 'fatura' ? '<span class="av" style="background:var(--brand-soft);color:var(--brand)">' + ico('cartao', 18) + '</span>' : avatar(it.nome, it.cat));
+  var alvo = it.tipo === 'conta' || it.tipo === 'fatura' ? ' data-id="' + it.id + '"' : ' data-linha="' + it.linha + '"';
+  var acao = atual && !it.ok ? '<button class="chk" data-act="ag-pagar" data-tipo="' + it.tipo + '"' + alvo + ' data-valor="' + it.valor + '" aria-label="' +
+             (receber ? 'Marcar como recebido' : 'Marcar como pago') + '">' + ico('check', 18) + '</button>'
+           : it.ok ? '<span class="chk feito" aria-hidden="true">' + ico('check', 18) + '</span>' : '';
+  return '<div class="item link' + (it.ok ? ' ok' : '') + '" role="button" tabindex="0" data-act="ag-editar" data-tipo="' + it.tipo + '"' + alvo + '>' + lado +
+    '<div class="info"><div class="nome">' + esc(it.nome) + '</div><div class="sub ' + (s.cls === 'ruim' ? 'v-neg' : s.cls === 'warn' ? 'v-warn' : '') + '">' + sub + '</div></div>' +
+    '<div class="valor num' + (receber ? ' v-pos' : '') + '">' + (receber ? '+ ' : '') + brl(it.valor) + '</div>' + acao + '</div>';
+}
+
+function pgAgenda() {
+  var atual = AG === 'atual', ch = atual ? D.ciclo.chave : D.proximo.chave, mes = atual ? D.ciclo.mes : D.proximo.mes;
+  var ini = diaUtil(ch), fim = diaUtil(somaC(ch, 1));
+  var h = '<div class="seg" style="grid-template-columns:repeat(2,1fr)">' + [['atual', cap(D.ciclo.mes)], ['proxima', cap(D.proximo.mes)]].map(function (a) {
+    return '<button data-act="agsub" data-s="' + a[0] + '"' + (AG === a[0] ? ' class="on"' : '') + '>' + a[1] + '</button>';
+  }).join('') + '</div>';
+
+  var itens = itensAgenda(AG), com = itens.filter(function (i) { return i.data; }), sem = itens.filter(function (i) { return !i.data; });
+  com.sort(function (a, b) { return a.data < b.data ? -1 : a.data > b.data ? 1 : (a.ok - b.ok); });
+  var aPagar = itens.filter(function (i) { return !i.ok && i.tipo !== 'receber'; });
+  var h2 = cab('Agenda de ' + mes, 'Do salário de ' + ddmm(ini) + ' ao salário de ' + ddmm(fim), 'agenda');
+  if (atual) {
+    var atras = aPagar.filter(function (i) { return i.data && i.data < D.hoje; });
+    var sete = aPagar.filter(function (i) { return i.data && i.data >= D.hoje && difDias(D.hoje, i.data) <= 7; });
+    var soma = function (l) { return l.reduce(function (s, i) { return s + i.valor; }, 0); };
+    h2 += linha('Atrasadas (' + atras.length + ')', soma(atras), atras.length ? 'cor' : '') + linha('Próximos 7 dias (' + sete.length + ')', soma(sete)) +
+      linha('Ainda a pagar no ciclo', soma(aPagar), 'total');
+    if (atras.length) h2 = h2.replace('<b class="num ">' + brl(soma(atras)), '<b class="num v-neg">' + brl(soma(atras)));
+  } else {
+    h2 += linha('Total previsto em ' + mes, aPagar.reduce(function (s, i) { return s + i.valor; }, 0), 'total');
+  }
+  h += '<div class="painel">' + h2 + '</div>';
+
+  var corpo = '<div class="marco"><span>Salário cai ' + semana(ini) + ', ' + ddmm(ini) + '</span><span class="num">+ ' + brl(D.salario) + '</span></div>';
+  var ultimo = '';
+  com.forEach(function (it) {
+    if (it.data !== ultimo) {
+      ultimo = it.data;
+      var ehHoje = it.data === D.hoje;
+      corpo += '<div class="dia-cab' + (ehHoje ? ' hoje' : '') + '">' + cap(semana(it.data)) + ', ' + ddmm(it.data) + (ehHoje ? ' (hoje)' : '') + '</div>';
+    }
+    corpo += itemAgenda(it, atual, false);
+  });
+  if (!com.length) corpo += '<div class="vazio">Nenhum vencimento com data neste ciclo.</div>';
+  corpo += '<div class="marco" style="background:var(--brand-soft);color:var(--brand)"><span>Próximo salário ' + semana(fim) + ', ' + ddmm(fim) + '</span><span>fim do ciclo</span></div>';
+  h += '<div class="painel">' + cab('Calendário', 'Toque num item para mudar a data', '') + corpo + '</div>';
+
+  if (sem.length) h += '<div class="painel">' + cab('Sem data de vencimento', 'Toque para definir o dia', '') +
+    sem.map(function (it) { return itemAgenda(it, atual, false); }).join('') + '</div>';
+  return h;
+}
+
+function acharLanc(linha) {
+  var todos = D.planejados.concat(D.recebiveis, D.prox.planejados, D.prox.recebiveis);
+  return todos.filter(function (p) { return String(p.linha) === String(linha); })[0];
+}
+
+function folhaVenc(id) {
+  var c = D.contas.filter(function (x) { return x.id === id; })[0];
+  if (!c) return;
+  EDIT = { id: id };
+  var h = '<h2 class="ftit">Vencimento: ' + esc(c.nome) + '</h2>' +
+    '<p class="dica">Conta fixa sempre conta no ciclo do salário que a paga. Se ela vence no começo do mês seguinte, escolha "No mês seguinte": a data mostra o mês certo e o valor continua neste ciclo.</p>' +
+    '<div class="par"><label class="campo"><span>Dia de vencimento</span><input id="v-dia" class="num" inputmode="numeric" value="' + esc(c.dia) + '" placeholder="1 a 31"></label>' +
+    '<label class="campo"><span>Vence</span><select id="v-seg">' + opts([['0', 'No mês do ciclo'], ['1', 'No mês seguinte']], c.mesSeguinte ? '1' : '0') + '</select></label></div>' +
+    '<div class="previa" id="v-previa"></div>' +
+    '<div class="botoes"><button class="btn" data-act="editar" data-id="' + id + '">Editar a conta</button>' +
+    '<button class="btn prim" data-act="venc-salvar" data-id="' + id + '">Salvar data</button></div>';
+  abrirFolha('venc', h);
+  previaVenc();
+}
+function previaVenc() {
+  var el = document.getElementById('v-previa');
+  if (!el) return;
+  var dia = parse(val('v-dia')), seg = val('v-seg') === '1';
+  if (dia === '' || isNaN(dia)) { el.textContent = 'Sem data: a conta continua contando no ciclo, só não aparece no calendário.'; return; }
+  el.textContent = 'Em ' + D.ciclo.mes + ' vence ' + ddmm(dataConta(D.ciclo.chave, dia, seg)) + ' e em ' + D.proximo.mes + ' vence ' +
+    ddmm(dataConta(D.proximo.chave, dia, seg)) + '. Sempre paga com o salário do ciclo.';
+}
+
+function folhaCartaoDatas(id) {
+  var k = D.cartoes.filter(function (x) { return x.id === id; })[0];
+  if (!k) return;
+  var h = '<h2 class="ftit">Datas do ' + esc(k.nome) + '</h2>' +
+    '<p class="dica">Com esses dias, o painel descobre sozinho em qual fatura cada compra cai e com qual salário ela é paga.</p>' +
+    '<div class="par"><label class="campo"><span>Dia de fechamento</span><input id="k-fech" class="num" inputmode="numeric" value="' + esc(k.fech || '') + '"></label>' +
+    '<label class="campo"><span>Dia de vencimento</span><input id="k-venc" class="num" inputmode="numeric" value="' + esc(k.venc || '') + '"></label></div>' +
+    '<button class="btn prim full" data-act="cartao-salvar" data-id="' + id + '">Salvar datas</button>';
+  abrirFolha('cartao', h);
+}
+
+function folhaPlanejado(linha) {
+  var p = acharLanc(linha);
+  if (!p) return;
+  var receber = D.recebiveis.concat(D.prox.recebiveis).some(function (x) { return String(x.linha) === String(linha); });
+  var h = '<h2 class="ftit">' + (receber ? 'Editar valor a receber' : 'Editar planejado') + '</h2>' +
+    '<label class="campo"><span>Descrição</span><input id="p-desc" value="' + esc(p.desc) + '"></label>' +
+    '<div class="par"><label class="campo"><span>Valor</span><input id="p-valor" class="num" inputmode="decimal" value="' + dec(p.valor) + '"></label>' +
+    '<label class="campo"><span>Vencimento</span><input type="date" id="p-data" value="' + esc(p.iso || D.hoje) + '"></label></div>' +
+    (receber ? '' : '<label class="campo"><span>Categoria</span><select id="p-cat">' + opts(D.listaCategorias.filter(function (c) { return c !== 'Reserva'; }), p.categoria || 'Outros') + '</select></label>') +
+    '<div class="previa" id="p-previa"></div>' +
+    '<div class="botoes"><button class="btn perigo" data-act="lexc" data-linha="' + linha + '">Excluir</button>' +
+    '<button class="btn prim" data-act="plan-salvar" data-linha="' + linha + '">Salvar</button></div>';
+  abrirFolha('plan', h);
+  previaPlan();
+}
+function previaPlan() {
+  var el = document.getElementById('p-previa');
+  if (!el) return;
+  var iso = val('p-data');
+  if (!iso) { el.textContent = 'Escolha a data de vencimento.'; return; }
+  var c = cicloDaData(iso);
+  if (difC(D.ciclo.chave, c) < 0) c = D.ciclo.chave;
+  el.textContent = 'Entra no ciclo de ' + longoC(c) + ', pago com o salário de ' + ddmm(diaUtil(c)) + '.';
+}
+
+// ----- Planos -----
+function pgPlanos() {
+  var abas = [['saude', 'Saúde'], ['projecao', 'Projeção'], ['metas', 'Metas'], ['historico', 'Histórico']];
+  var h = '<div class="seg seg4">' + abas.map(function (a) {
+    return '<button data-act="sub" data-s="' + a[0] + '"' + (SUB === a[0] ? ' class="on"' : '') + '>' + a[1] + '</button>';
+  }).join('') + '</div>';
+  return h + { saude: pgSaude, projecao: pgProjecao, metas: pgMetas, historico: pgHistorico }[SUB]();
+}
+
+function indicador(titulo, valorTxt, largura, marca, estado, texto) {
+  var cls = { bom: 'bom', atencao: 'warn', ruim: 'ruim' }[estado];
+  var rot = { bom: 'Saudável', atencao: 'Atenção', ruim: 'Fora da referência' }[estado];
+  var corBarra = { bom: 'var(--pos)', atencao: 'var(--warn)', ruim: 'var(--neg)' }[estado];
+  return '<div class="ind"><div class="ind-top"><span class="sub" style="font-weight:700">' + titulo + '</span><span class="tag ' + cls + '">' + rot + '</span></div>' +
+    '<div class="ind-val num">' + valorTxt + '</div>' +
+    '<div class="barra"><span style="width:' + Math.min(100, largura * 100) + '%;background:' + corBarra + '"></span>' +
+    (marca !== null ? '<i class="marca" style="left:' + (marca * 100) + '%"></i>' : '') + '</div>' +
+    '<div class="sub">' + texto + '</div></div>';
+}
+
+function pgSaude() {
+  var s = D.saude, sal = s.salario || 1;
+  var fixo = s.custoFixo / sal, div = s.dividas / sal, poup = s.poupanca / sal, res = s.reservaMeses;
+  var h = '<div class="cols"><div><div class="painel">' + cab('Saúde financeira', 'Com base no salário de ' + brl(s.salario), 'saude') +
+    indicador('Custo fixo', pctTxt(fixo), fixo, .5, fixo <= .5 ? 'bom' : fixo <= .6 ? 'atencao' : 'ruim',
+      brl(s.custoFixo) + ' em contas fixas. Referência: até 50% do salário.') +
+    indicador('Dívidas e parcelas', pctTxt(div), div, .3, div <= .3 ? 'bom' : div <= .4 ? 'atencao' : 'ruim',
+      brl(s.dividas) + ' por mês. Referência: até 30% do salário.') +
+    indicador('Poupança do mês', pctTxt(poup), poup / .3, .2 / .3, poup >= .2 ? 'bom' : poup >= .1 ? 'atencao' : 'ruim',
+      brl(s.poupanca) + ' para a reserva. Referência: 20% do salário.') +
+    indicador('Reserva de emergência', res.toFixed(1).replace('.', ',') + ' meses', res / 6, .5, res >= 6 ? 'bom' : res >= 3 ? 'atencao' : 'ruim',
+      'Quantos meses de custo fixo a reserva cobre. Referência: de 3 a 6 meses.') +
+    '</div></div><div>';
+
+  var t = D.categorias, g = { nec: 0, des: 0, fut: 0 };
+  Object.keys(t).forEach(function (k) {
+    if (NECESSIDADES.indexOf(k) >= 0) g.nec += t[k]; else if (FUTURO.indexOf(k) >= 0) g.fut += t[k]; else g.des += t[k];
+  });
+  var sobra = s.salario - g.nec - g.des - g.fut;
+  var barra = function (rotulo, desc, v, ref, corB) {
+    var p = v / sal;
+    return '<div class="ind"><div class="ind-top"><span style="font-weight:700">' + rotulo + '</span><span class="num"><b>' + pctTxt(p) + '</b> <span class="sub">de ' + Math.round(ref * 100) + '%</span></span></div>' +
+      '<div class="barra"><span style="width:' + Math.min(100, p * 100) + '%;background:' + corB + '"></span><i class="marca" style="left:' + (ref * 100) + '%"></i></div>' +
+      '<div class="sub">' + brl(v) + '. ' + desc + '</div></div>';
+  };
+  h += '<div class="painel">' + cab('Divisão 50/30/20', 'Saídas de ' + D.ciclo.mes + ' em relação ao salário', 'regra') +
+    barra('Necessidades', 'Moradia, alimentação, transporte, saúde, educação, dízimo e pets.', g.nec, .5, 'var(--brand)') +
+    barra('Desejos', 'Pessoal, lazer, compras, outros e cartão sem detalhe.', g.des, .3, 'var(--warn)') +
+    barra('Futuro', 'Reserva e dívidas.', g.fut, .2, 'var(--pos)') +
+    linha(sobra >= 0 ? 'Sobra sem destino' : 'Saídas acima do salário', sobra, 'total') + '</div>';
+  return h + cardReserva() + '</div></div>';
+}
+
+function pgProjecao() {
+  var pontos = [{ nome: D.ciclo.nome, v: D.livre + D.aReceber }].concat(D.projecao.map(function (p) { return { nome: p.nome, v: p.livre }; }));
+  var W = 700, H = 220, pt = 24, pb = 28, bw = (W - 16) / pontos.length;
+  var vals = pontos.map(function (p) { return p.v; });
+  var max = Math.max.apply(null, vals.concat([0])), min = Math.min.apply(null, vals.concat([0])), span = (max - min) || 1;
+  var y = function (v) { return pt + (max - v) / span * (H - pt - pb); };
+  var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" role="img" aria-label="Livre acumulado por ciclo">' +
+    '<line x1="8" x2="' + (W - 8) + '" y1="' + y(0) + '" y2="' + y(0) + '" stroke="var(--line)"/>';
+  pontos.forEach(function (p, i) {
+    var w = Math.min(bw * .6, 60), x = 8 + i * bw + (bw - w) / 2, topo = Math.min(y(p.v), y(0)), alt = Math.max(Math.abs(y(p.v) - y(0)), 2);
+    s += '<rect x="' + x + '" y="' + topo + '" width="' + w + '" height="' + alt + '" rx="6" fill="' + (p.v < 0 ? 'var(--neg)' : i === 0 ? 'var(--hero)' : 'var(--brand)') + '"/>';
+    s += '<text x="' + (x + w / 2) + '" y="' + (p.v < 0 ? topo + alt + 13 : topo - 7) + '" text-anchor="middle">' + Math.round(p.v).toLocaleString('pt-BR') + '</text>';
+    s += '<text x="' + (x + w / 2) + '" y="' + (H - 8) + '" text-anchor="middle">' + esc(p.nome.replace('/20', '/')) + '</text>';
+  });
+  s += '</svg>';
+  var h = '<div class="painel">' + cab('Projeção de 6 meses', 'Dinheiro livre acumulado no fim de cada ciclo', 'projecao') + s + '</div>';
+  h += '<div class="cols">' + D.projecao.map(function (p) {
+    var ev = p.eventos.map(function (e) {
+      var pre = { fim: 'Termina: ', sai: 'Planejado: ', entra: 'A receber: ' }[e.tipo];
+      return '<div class="evento"><span>' + pre + esc(e.txt) + '</span><b class="num' + (e.tipo === 'entra' ? ' v-pos' : '') + '">' + brl(e.valor) + '</b></div>';
+    }).join('');
+    return '<div class="painel">' + cab(cap(p.mes) + ' de ' + p.chave.slice(0, 4), 'Resultado do mês ' + sinal(p.resultado), '',
+      '<b class="num ' + (p.livre < 0 ? 'v-neg' : '') + '">' + brl(p.livre) + '</b>') +
+      linha('Salário', p.salario) + (p.extras ? linha('A receber', p.extras) : '') +
+      linha('Contas fixas', -p.fixas) + linha('Faturas conhecidas', -p.cartao) + (p.planejados ? linha('Planejados', -p.planejados) : '') +
+      (ev ? '<div style="margin-top:8px">' + ev + '</div>' : '') + '</div>';
+  }).join('') + '</div>';
+  return h;
+}
+
+function pgMetas() {
+  var lista = D.objetivos.filter(function (o) { return o.ativo; });
+  var h = '<div class="painel">' + cab('Metas', 'Objetivos com valor e prazo', 'metas') +
+    (lista.length ? lista.map(function (o) {
+      var plano = o.falta <= 0 ? 'Meta atingida' :
+        o.mesesRestantes ? 'Faltam ' + brl(o.falta) + '. Guarde ' + brl(o.porMes) + ' por mês até ' + o.prazoNome : 'Faltam ' + brl(o.falta) + '. Sem prazo definido';
+      return '<div class="ind"><div class="ind-top"><span style="font-weight:800">' + esc(o.nome) + '</span><span class="num"><b>' + brl(o.guardado) + '</b> <span class="sub">de ' + brl(o.alvo) + '</span></span></div>' +
+        '<div class="barra"><span style="width:' + (o.pct * 100) + '%;background:var(--pos)"></span></div>' +
+        '<div class="sub">' + plano + '</div>' +
+        '<div class="botoes" style="margin-top:10px"><button class="btn sm" data-act="obj-edit" data-id="' + o.id + '">Editar</button>' +
+        '<button class="btn sm prim" data-act="obj-dep" data-id="' + o.id + '">Guardar</button></div></div>';
+    }).join('') : '<div class="vazio">Nenhuma meta ainda. Crie uma para saber quanto guardar por mês.</div>') +
+    '<button class="btn full" style="margin-top:12px" data-act="obj-edit" data-id="">Nova meta</button></div>';
+  var pausadas = D.objetivos.filter(function (o) { return !o.ativo; });
+  if (pausadas.length) h += '<div class="painel">' + cab('Metas pausadas', '', '') + pausadas.map(function (o) {
+    return '<button class="item" data-act="obj-edit" data-id="' + o.id + '"><span class="av" style="background:var(--soft);color:var(--muted)">' + ico('meta', 18) + '</span>' +
+      '<div class="info"><div class="nome">' + esc(o.nome) + '</div><div class="sub">' + brl(o.guardado) + ' de ' + brl(o.alvo) + '</div></div></button>';
+  }).join('') + '</div>';
+  return h;
+}
+
+function pgHistorico() {
+  var pend = D.fixas.filter(function (c) { return !c.ok; }).length + D.faturas.filter(function (f) { return !f.ok; }).length + D.planejados.length;
+  var h = '<div class="painel">' + cab('Fechar ' + D.ciclo.mes, 'Use no último dia, antes do salário cair' +
+    (pend ? '. Ainda há ' + pend + (pend === 1 ? ' item pendente' : ' itens pendentes') : ''), 'fechar') +
+    '<button class="btn prim full" style="margin-top:6px" data-act="fechar">Fechar ' + D.ciclo.mes + '</button></div>';
+  if (!D.historico.length) return h + '<div class="painel vazio">Nenhum ciclo fechado ainda. O primeiro resumo aparece aqui quando você fechar ' + D.ciclo.mes + '.</div>';
+
+  h += '<div class="cols">' + D.historico.slice().reverse().map(function (x) {
+    var cats = x.categorias, tot = Object.keys(cats).reduce(function (s, k) { return s + cats[k]; }, 0);
+    var barra = tot ? '<div class="barra">' + Object.keys(cats).sort(function (a, b) { return cats[b] - cats[a]; }).map(function (k) {
+      return '<span title="' + esc(k) + ': ' + brl(cats[k]) + '" style="width:' + (cats[k] / tot * 100) + '%;background:' + cor(k) + '"></span>';
+    }).join('') + '</div>' : '';
+    return '<div class="painel">' + cab(cap(longoC(x.ciclo)) + ' de ' + x.ciclo.slice(0, 4), 'Terminou com ' + brl(x.saldoFinal) + ' na conta', 'historico',
+      '<b class="num ' + (x.resultado < 0 ? 'v-neg' : 'v-pos') + '">' + sinal(x.resultado) + '</b>') + barra +
+      linha('Saldo inicial', x.saldoInicial, 'cor') + linha('Salário', x.salario) + linha('Entradas extras', x.entradas) +
+      linha('Contas fixas', -x.fixas) + linha('Faturas', -x.faturas) + linha('Gastos à vista', -x.gastos) +
+      linha('Desse total, guardado', x.guardado) + linha('Saldo final', x.saldoFinal, 'total') + '</div>';
+  }).join('') + '</div>';
+  return h;
+}
+
+function fechar() {
+  var pf = D.fixas.filter(function (c) { return !c.ok; }), pt = D.faturas.filter(function (f) { return !f.ok; });
+  var msg = 'Fechar ' + D.ciclo.mes + '?\n\n';
+  if (pf.length || pt.length || D.planejados.length) msg += 'Ainda não pagos (não entram no fechamento):\n' +
+    pf.map(function (c) { return '• ' + c.nome + ' (' + brl(c.previsto) + ')'; })
+      .concat(pt.map(function (f) { return '• Fatura ' + f.nome + ' (' + brl(f.previsto) + ')'; }))
+      .concat(D.planejados.map(function (p) { return '• ' + p.desc + ' (' + brl(p.valor) + ')'; })).join('\n') + '\n\n';
+  msg += 'O resumo vai para o Histórico e o próximo ciclo é aberto.';
+  if (confirm(msg)) call('fecharCiclo');
+}
+
+// ---------- folhas (janelas que sobem de baixo) ----------
+function abrirFolha(nome, html) {
+  FOLHA = nome;
+  document.getElementById('folha').innerHTML = '<div class="alca"></div>' + html;
+  document.getElementById('veu').className = 'aberto';
+}
+function fecharFolha() {
+  FOLHA = '';
+  document.getElementById('veu').className = '';
+  document.getElementById('folha').innerHTML = '';
+}
+
+function folhaAjuda(k) {
+  var x = INFO[k];
+  if (!x) return;
+  abrirFolha('ajuda', '<h2 class="ftit">' + x.t + '</h2>' +
+    '<div class="bloco"><h3>O que mostra</h3><p>' + x.m + '</p></div>' +
+    '<div class="bloco"><h3>Como é calculado</h3><p>' + x.c + '</p></div>' +
+    '<div class="bloco"><h3>Como ajustar</h3><p>' + x.a + '</p></div>' +
+    '<button class="btn full" data-act="fechar-folha">Entendi</button>');
+}
+
+function folhaLancar(tipo) {
+  var valor = val('f-valor'), desc = val('f-desc'), cat = val('f-cat'), data = val('f-data') || D.hoje, sit = val('f-sit') || 'pago';
+  if (tipo) TIPO = tipo;
+  var h = '<h2 class="ftit">Novo lançamento</h2><div class="seg">' + ['Gasto', 'Cartão', 'Entrada'].map(function (t) {
+    return '<button data-act="tipo" data-t="' + t + '"' + (TIPO === t ? ' class="on"' : '') + '>' + t + '</button>';
+  }).join('') + '</div>';
+  h += '<input id="f-valor" class="valor-grande num" inputmode="decimal" placeholder="R$ 0,00" value="' + esc(valor) + '" aria-label="Valor">';
+  h += '<label class="campo"><span>Descrição</span><input id="f-desc" value="' + esc(desc) + '" placeholder="' + (TIPO === 'Entrada' ? 'Ex.: 13º salário, reembolso' : 'Ex.: mercado, farmácia') + '"></label>';
+  if (TIPO !== 'Entrada') {
+    h += '<label class="campo"><span>Categoria</span><select id="f-cat">' + opts(D.listaCategorias.filter(function (c) { return c !== 'Reserva'; }), cat || 'Alimentação') + '</select></label>';
+  }
+  if (TIPO === 'Cartão') {
+    var cartoes = D.cartoes.filter(function (k) { return k.ativo; });
+    if (!cartoes.length) cartoes = D.cartoes;
+    h += '<div class="par"><label class="campo"><span>Cartão</span><select id="f-cartao">' + opts(cartoes.map(function (k) { return [k.id, k.nome]; })) + '</select></label>' +
+      '<label class="campo"><span>Parcelas</span><select id="f-parc">' + opts([1,2,3,4,5,6,7,8,9,10,11,12].map(function (n) { return [n, n === 1 ? 'À vista' : n + 'x']; }), 1) + '</select></label></div>';
+    h += '<label class="campo"><span>Data da compra</span><input type="date" id="f-data" value="' + esc(data) + '"></label>';
+    h += '<div class="previa" id="f-previa"></div>';
+  } else {
+    var ops = TIPO === 'Gasto' ? [['pago', 'Já paguei'], ['pendente', 'Vou pagar']] : [['pago', 'Já recebi'], ['pendente', 'Vou receber']];
+    h += '<div class="par"><label class="campo"><span>Situação</span><select id="f-sit">' + opts(ops, sit) + '</select></label>' +
+      '<label class="campo"><span>' + (sit === 'pendente' ? 'Vencimento' : 'Data') + '</span><input type="date" id="f-data" value="' + esc(data) + '"></label></div>';
+    h += sit === 'pendente' ? '<div class="previa" id="f-previa"></div>'
+       : '<p class="dica">' + (TIPO === 'Gasto' ? 'Sai da conta agora, neste ciclo (Pix, débito ou dinheiro).' : 'Soma no saldo agora, neste ciclo.') + '</p>';
+  }
+  h += '<button class="btn prim full" data-act="salvar-lanc">' + { 'Gasto': 'Lançar gasto', 'Cartão': 'Lançar compra', 'Entrada': 'Lançar entrada' }[TIPO] + '</button>';
+  abrirFolha('lancar', h);
+  previa();
+  if (!valor) document.getElementById('f-valor').focus();
+}
+
+function previa() {
+  var el = document.getElementById('f-previa');
+  if (!el) return;
+  if (TIPO !== 'Cartão') {
+    var iso = val('f-data') || D.hoje, ci = cicloDaData(iso);
+    if (difC(D.ciclo.chave, ci) < 0) ci = D.ciclo.chave;
+    el.textContent = (TIPO === 'Gasto' ? 'Fica como planejado' : 'Fica como valor a receber') + ' no ciclo de ' + longoC(ci) +
+      ', do salário de ' + ddmm(diaUtil(ci)) + '.';
+    return;
+  }
+  var k = D.cartoes.filter(function (x) { return x.id === val('f-cartao'); })[0];
+  var c = cicloCompra(val('f-data') || D.hoje, k);
+  if (difC(D.ciclo.chave, c) < 0) c = D.ciclo.chave;
+  var n = Number(val('f-parc')) || 1, v = parse(val('f-valor'));
+  var txt = 'Entra na fatura paga em ' + nomeC(c);
+  if (n > 1) txt += ' e vai até ' + nomeC(somaC(c, n - 1)) + (v > 0 ? ', em ' + n + 'x de ' + brl(v / n) : '');
+  el.textContent = txt + '.';
+}
+
+function salvarLanc() {
+  var v = parse(val('f-valor'));
+  if (v === '' || isNaN(v) || v <= 0) { toast('Informe um valor maior que zero', true); return; }
+  if (!val('f-desc').trim()) { toast('Informe a descrição', true); return; }
+  call('lancar', { tipo: TIPO, valor: v, desc: val('f-desc'), categoria: val('f-cat'), data: val('f-data'),
+                   situacao: val('f-sit') || 'pago', cartao: val('f-cartao'), parcelas: val('f-parc') });
+}
+
+function folhaConta(id) {
+  var c = D.contas.filter(function (x) { return x.id === id; })[0] ||
+    { id: '', nome: '', valor: '', categoria: 'Outros', tipo: 'Gasto', dia: '', inicio: D.ciclo.chave, meses: '', ativa: true, obs: '', mesSeguinte: false };
+  var h = '<h2 class="ftit">' + (c.id ? 'Editar conta' : 'Nova conta fixa') + '</h2>' +
+    '<p class="dica">O valor aqui é o padrão de todos os meses. Para mudar só este mês, use o campo na lista de contas fixas.</p>' +
+    '<label class="campo"><span>Nome</span><input id="e-nome" value="' + esc(c.nome) + '" placeholder="Ex.: Academia"></label>' +
+    '<div class="par"><label class="campo"><span>Valor padrão</span><input id="e-valor" class="num" inputmode="decimal" value="' + dec(c.valor) + '" placeholder="0,00"></label>' +
+    '<label class="campo"><span>Dia de vencimento</span><input id="e-dia" inputmode="numeric" value="' + esc(c.dia) + '" placeholder="Opcional"></label></div>' +
+    '<label class="campo"><span>O vencimento cai</span><select id="e-seg">' + opts([['0', 'No mês do ciclo'], ['1', 'No mês seguinte (pago com o salário do ciclo)']], c.mesSeguinte ? '1' : '0') + '</select></label>' +
+    '<div class="par"><label class="campo"><span>Categoria</span><select id="e-cat">' + opts(D.listaCategorias, c.categoria) + '</select></label>' +
+    '<label class="campo"><span>Tipo</span><select id="e-tipo">' + opts([['Gasto', 'Gasto'], ['Reserva', 'Reserva (guardar)']], c.tipo) + '</select></label></div>' +
+    '<div class="par"><label class="campo"><span>Começa no ciclo</span><input type="month" id="e-inicio" value="' + esc(c.inicio) + '"></label>' +
+    '<label class="campo"><span>Nº de ciclos</span><input id="e-meses" inputmode="numeric" value="' + esc(c.meses) + '" placeholder="Vazio = sem fim"></label></div>' +
+    '<label class="campo"><span>Observação</span><input id="e-obs" value="' + esc(c.obs) + '"></label>' +
+    '<label class="check"><input type="checkbox" id="e-ativa"' + (c.ativa ? ' checked' : '') + '> Conta ativa</label>' +
+    '<div class="botoes">' + (c.id ? '<button class="btn perigo" data-act="excluir-conta" data-id="' + c.id + '">Excluir</button>' : '') +
+    '<button class="btn prim" data-act="salvar-conta" data-id="' + c.id + '">Salvar</button></div>';
+  abrirFolha('conta', h);
+}
+
+function salvarConta(id) {
+  var v = parse(val('e-valor')), m = parse(val('e-meses')), dia = parse(val('e-dia'));
+  if (!val('e-nome').trim()) { toast('Informe o nome da conta', true); return; }
+  if (v === '' || isNaN(v)) { toast('Informe o valor', true); return; }
+  if ((m !== '' && isNaN(m)) || (dia !== '' && isNaN(dia))) { toast('Confira o dia e o nº de ciclos', true); return; }
+  call('salvarConta', { id: id, nome: val('e-nome'), valor: v, categoria: val('e-cat'), tipo: val('e-tipo'), dia: dia,
+                        inicio: val('e-inicio'), meses: m, ativa: document.getElementById('e-ativa').checked, obs: val('e-obs'),
+                        mesSeguinte: val('e-seg') === '1' });
+}
+
+function folhaObjetivo(id) {
+  var o = D.objetivos.filter(function (x) { return x.id === id; })[0] || { id: '', nome: '', alvo: '', guardado: 0, prazo: '', ativo: true };
+  var h = '<h2 class="ftit">' + (o.id ? 'Editar meta' : 'Nova meta') + '</h2>' +
+    '<label class="campo"><span>Nome</span><input id="o-nome" value="' + esc(o.nome) + '" placeholder="Ex.: Viagem, celular novo"></label>' +
+    '<div class="par"><label class="campo"><span>Valor da meta</span><input id="o-alvo" class="num" inputmode="decimal" value="' + dec(o.alvo) + '" placeholder="0,00"></label>' +
+    '<label class="campo"><span>Já guardado</span><input id="o-guardado" class="num" inputmode="decimal" value="' + dec(o.guardado) + '"></label></div>' +
+    '<label class="campo"><span>Prazo</span><input type="month" id="o-prazo" value="' + esc(o.prazo) + '"></label>' +
+    '<label class="check"><input type="checkbox" id="o-ativo"' + (o.ativo ? ' checked' : '') + '> Meta ativa</label>' +
+    '<div class="botoes">' + (o.id ? '<button class="btn perigo" data-act="obj-excluir" data-id="' + o.id + '">Excluir</button>' : '') +
+    '<button class="btn prim" data-act="obj-salvar" data-id="' + o.id + '">Salvar</button></div>';
+  abrirFolha('objetivo', h);
+}
+
+function salvarObjetivo(id) {
+  var alvo = parse(val('o-alvo')), g = parse(val('o-guardado'));
+  if (!val('o-nome').trim()) { toast('Informe o nome da meta', true); return; }
+  if (alvo === '' || isNaN(alvo) || alvo <= 0) { toast('Informe o valor da meta', true); return; }
+  if (g !== '' && isNaN(g)) { toast('Confira o valor guardado', true); return; }
+  call('salvarObjetivo', { id: id, nome: val('o-nome'), alvo: alvo, guardado: g === '' ? 0 : g, prazo: val('o-prazo'),
+                           ativo: document.getElementById('o-ativo').checked });
+}
+
+function folhaDeposito(id) {
+  var o = D.objetivos.filter(function (x) { return x.id === id; })[0];
+  if (!o) return;
+  var h = '<h2 class="ftit">' + esc(o.nome) + '</h2>' +
+    '<p class="dica">Guardado: ' + brl(o.guardado) + ' de ' + brl(o.alvo) + (o.porMes ? '. Sugestão para este mês: ' + brl(o.porMes) : '') + '.</p>' +
+    '<input id="d-valor" class="valor-grande num" inputmode="decimal" placeholder="R$ 0,00" value="' + (o.porMes ? dec(Math.ceil(o.porMes)) : '') + '" aria-label="Valor">' +
+    '<label class="check"><input type="checkbox" id="d-saldo" checked> Tirar do saldo deste ciclo</label>' +
+    '<div class="botoes"><button class="btn" data-act="obj-retirar" data-id="' + o.id + '">Retirar</button>' +
+    '<button class="btn prim" data-act="obj-guardar" data-id="' + o.id + '">Guardar</button></div>';
+  abrirFolha('deposito', h);
+}
+
+function movimentarObjetivo(id, sinalMov) {
+  var v = parse(val('d-valor'));
+  if (v === '' || isNaN(v) || v <= 0) { toast('Informe um valor maior que zero', true); return; }
+  call('depositarObjetivo', id, v * sinalMov, document.getElementById('d-saldo').checked);
+}
+
+function folhaAjustes() {
+  if (!D) { telaConexao(); return; }
+  var c = D.config;
+  function campo(nome, chave, dica, inteiro) {
+    var v = c[nome];
+    return '<label class="campo"><span>' + nome + '</span><input class="num" id="cfg-' + chave + '" data-act="cfg" data-campo="' + esc(nome) +
+      '" inputmode="decimal" value="' + esc(inteiro ? v : dec(v)) + '"></label>' + (dica ? '<p class="dica" style="margin-top:-6px">' + dica + '</p>' : '');
+  }
+  var h = '<h2 class="ftit">Ajustes</h2>' +
+    campo('Salário líquido', 'sal', 'O que cai na conta todo mês.') +
+    campo('Saldo antes do salário', 'saldo', 'Vale só para o primeiro ciclo. Depois, o saldo final de cada ciclo passa sozinho para o próximo. Use número negativo se estiver no limite.') +
+    campo('Limite da conta', 'lim', 'O cheque especial disponível no banco.') +
+    campo('Reserva já guardada', 'res', 'O que já estava guardado antes de dezembro.') +
+    campo('Meta da reserva (meses)', 'meta', 'Quantos meses de custo fixo você quer ter guardado.', true) +
+    '<p class="dica">Os dias de fechamento e vencimento dos cartões se mudam na tela Contas, aba Cartão, em Editar datas do cartão.</p>' +
+    '<button class="btn full" data-act="conexao" style="margin-bottom:10px">Conexão deste aparelho</button>' +
+    '<button class="btn full" data-act="fechar-folha">Pronto</button>';
+  abrirFolha('ajustes', h);
+}
+
+// ---------- simulador (não grava nada) ----------
+function ativaEm(id, k) {
+  var c = D.contas.filter(function (x) { return x.id === id; })[0];
+  if (!c || !c.ativa || !c.inicio) return false;
+  var d = difC(c.inicio, k);
+  return d >= 0 && (c.meses === '' || d < c.meses);
+}
+
+function folhaSimulador() {
+  if (!SIM) SIM = { salario: D.salario, extra: 0, cartaoProx: D.proximo.cartao, contas: {}, faturas: {} };
+  D.fixas.forEach(function (c) { if (!SIM.contas[c.id]) SIM.contas[c.id] = { on: true, valor: c.previsto }; });
+  D.faturas.forEach(function (f) { if (SIM.faturas[f.id] === undefined) SIM.faturas[f.id] = f.ok ? f.pago : f.previsto; });
+  var h = '<h2 class="ftit">Simulador</h2>' +
+    '<p class="dica">Desmarque uma conta para tirá-la ou troque qualquer valor: os números mudam na hora e nada é salvo na planilha.</p>' +
+    '<div class="sim-res" id="sim-res"></div>' +
+    '<div class="par"><label class="campo"><span>Salário (a partir de ' + D.proximo.mes + ')</span><input id="sim-sal" class="num" inputmode="decimal" value="' + dec(SIM.salario) + '"></label>' +
+    '<label class="campo"><span>Gasto novo por mês</span><input id="sim-extra" class="num" inputmode="decimal" placeholder="0,00" value="' + (SIM.extra ? dec(SIM.extra) : '') + '"></label></div>' +
+    '<div class="sec">Cartão</div>' +
+    D.faturas.map(function (f) {
+      return '<div class="item"><span class="av" style="background:var(--brand-soft);color:var(--brand)">' + ico('cartao', 18) + '</span>' +
+        '<div class="info"><div class="nome">Fatura ' + esc(f.nome) + ' de ' + D.ciclo.mes + '</div><div class="sub">' +
+        (f.ok ? 'Já paga, não muda mais' : 'Hoje: ' + brl(f.previsto)) + '</div></div>' +
+        '<input class="inp-pg num" id="sim-f-' + f.id + '" inputmode="decimal" value="' + dec(SIM.faturas[f.id]) + '"' + (f.ok ? ' disabled' : '') + ' aria-label="Valor simulado da fatura"></div>';
+    }).join('') +
+    '<div class="item"><span class="av" style="background:var(--brand-soft);color:var(--brand)">' + ico('cartao', 18) + '</span>' +
+    '<div class="info"><div class="nome">Faturas de ' + D.proximo.mes + '</div><div class="sub">Hoje: ' + brl(D.proximo.cartao) + '</div></div>' +
+    '<input class="inp-pg num" id="sim-cprox" inputmode="decimal" value="' + dec(SIM.cartaoProx) + '" aria-label="Valor simulado da próxima fatura"></div>' +
+    '<div class="sec">Contas fixas</div>' +
+    D.fixas.map(function (c) {
+      var s = SIM.contas[c.id];
+      return '<div class="item' + (s.on ? '' : ' fora') + '" id="sim-it-' + c.id + '">' +
+        '<input type="checkbox" id="sim-on-' + c.id + '"' + (s.on ? ' checked' : '') + ' aria-label="Incluir ' + esc(c.nome) + '">' +
+        '<div class="info"><div class="nome">' + esc(c.nome) + '</div><div class="sub">' +
+        (c.ok ? 'Já paga em ' + D.ciclo.mes + ', muda a partir de ' + D.proximo.mes : 'Hoje: ' + brl(c.previsto)) + '</div></div>' +
+        '<input class="inp-pg num" id="sim-v-' + c.id + '" inputmode="decimal" value="' + dec(s.valor) + '" aria-label="Valor simulado"></div>';
+    }).join('') +
+    '<div class="botoes" style="margin-top:14px"><button class="btn" data-act="sim-limpar">Voltar ao original</button>' +
+    '<button class="btn prim" data-act="fechar-folha">Fechar</button></div>';
+  abrirFolha('sim', h);
+  calcSim();
+}
+
+function calcSim() {
+  if (!SIM || FOLHA !== 'sim') return;
+  function num(id, padrao) { var v = parse(val(id)); return v === '' || isNaN(v) ? padrao : v; }
+  SIM.salario = num('sim-sal', D.salario);
+  SIM.extra = num('sim-extra', 0);
+  SIM.cartaoProx = num('sim-cprox', D.proximo.cartao);
+
+  var totHoje = 0, totSim = 0, difAgora = 0, difProx = 0;
+  D.fixas.forEach(function (c) {
+    var on = document.getElementById('sim-on-' + c.id).checked;
+    var digitado = num('sim-v-' + c.id, c.previsto), v = on ? digitado : 0;
+    SIM.contas[c.id] = { on: on, valor: digitado };
+    document.getElementById('sim-it-' + c.id).className = 'item' + (on ? '' : ' fora');
+    totHoje += c.previsto; totSim += v;
+    if (!c.ok) difAgora += v - c.previsto;
+    if (ativaEm(c.id, D.proximo.chave)) difProx += v - c.previsto;
+  });
+  D.faturas.forEach(function (f) {
+    var base = f.ok ? f.pago : f.previsto, v = f.ok ? base : num('sim-f-' + f.id, base);
+    SIM.faturas[f.id] = v;
+    totHoje += base; totSim += v;
+    if (!f.ok) difAgora += v - f.previsto;
+  });
+
+  var livreAgora = D.livre - difAgora - SIM.extra;
+  var livreProx = livreAgora + D.aReceber + SIM.salario + D.proximo.extras - (D.proximo.fixas + difProx) - SIM.cartaoProx - D.proximo.planejados - SIM.extra;
+  function caixa(rotulo, v, hoje, cheio, menorEhMelhor) {
+    var dif = v - hoje, bom = menorEhMelhor ? dif < 0 : dif > 0;
+    return '<div class="sim-box' + (cheio ? ' cheio' : '') + '"><small>' + rotulo + '</small><b class="num' + (v < 0 ? ' v-neg' : '') + '">' + brl(v) + '</b>' +
+      '<div class="sub">' + (Math.abs(dif) > 0.004 ? '<span class="' + (bom ? 'v-pos' : 'v-neg') + '">' + sinal(dif) + '</span> em relação a hoje' : 'Igual a hoje') + '</div></div>';
+  }
+  document.getElementById('sim-res').innerHTML = '<div class="sim-grid">' +
+    caixa('Contas fixas + faturas de ' + D.ciclo.mes, totSim, totHoje, true, true) +
+    caixa('Livre até o salário', livreAgora, D.livre) +
+    caixa('Livre em ' + D.proximo.mes, livreProx, D.proximo.livre) + '</div>';
+}
+
+// ---------- eventos ----------
+document.addEventListener('click', function (ev) {
+  if (ev.target.id === 'veu') { fecharFolha(); return; }
+  var t = ev.target.closest('[data-act]');
+  if (!t || t.tagName === 'INPUT') return;
+  var act = t.getAttribute('data-act'), id = t.getAttribute('data-id');
+
+  if (act === 'ir') { PAG = t.getAttribute('data-pag'); render(); window.scrollTo(0, 0); }
+  if (act === 'sub') { SUB = t.getAttribute('data-s'); render(); }
+  if (act === 'csub') { CSUB = t.getAttribute('data-s'); render(); }
+  if (act === 'agsub') { AG = t.getAttribute('data-s'); render(); }
+  if (act === 'ag-pagar') {
+    var tp = t.getAttribute('data-tipo'), vl = Number(t.getAttribute('data-valor'));
+    if (tp === 'conta') call('pagarConta', id, vl);
+    else if (tp === 'fatura') call('pagarFatura', id, vl);
+    else call('efetivar', t.getAttribute('data-linha'), vl);
+  }
+  if (act === 'ag-editar') {
+    var te = t.getAttribute('data-tipo');
+    if (te === 'conta') folhaVenc(id);
+    else if (te === 'fatura') folhaCartaoDatas(id);
+    else folhaPlanejado(t.getAttribute('data-linha'));
+  }
+  if (act === 'cartao-datas') folhaCartaoDatas(id);
+  if (act === 'venc-salvar') {
+    var vd = parse(val('v-dia'));
+    if (vd !== '' && (isNaN(vd) || vd < 1 || vd > 31)) { toast('O dia precisa estar entre 1 e 31', true); return; }
+    call('salvarVencimento', id, vd, val('v-seg') === '1');
+  }
+  if (act === 'cartao-salvar') {
+    var kf = parse(val('k-fech')), kv = parse(val('k-venc'));
+    if ([kf, kv].some(function (x) { return x === '' || isNaN(x) || x < 1 || x > 31; })) { toast('Os dias precisam estar entre 1 e 31', true); return; }
+    call('salvarCartao', id, kf, kv);
+  }
+  if (act === 'plan-salvar') {
+    var pv = parse(val('p-valor'));
+    if (pv === '' || isNaN(pv) || pv <= 0) { toast('Informe um valor maior que zero', true); return; }
+    if (!val('p-desc').trim()) { toast('Informe a descrição', true); return; }
+    call('editarLancamento', t.getAttribute('data-linha'), { desc: val('p-desc'), valor: pv, data: val('p-data'), categoria: val('p-cat') });
+  }
+  if (act === 'recarregar') load();
+  if (act === 'ajustes') folhaAjustes();
+  if (act === 'ajuda') folhaAjuda(t.getAttribute('data-k'));
+  if (act === 'fechar-folha') fecharFolha();
+  if (act === 'lancar') folhaLancar(t.getAttribute('data-t') || 'Gasto');
+  if (act === 'tipo') folhaLancar(t.getAttribute('data-t'));
+  if (act === 'salvar-lanc') salvarLanc();
+  if (act === 'pagar' || act === 'pagarFat') {
+    var v = parse(val((act === 'pagar' ? 'pg-' : 'ft-') + id));
+    if (v === '' || isNaN(v)) { toast('Valor inválido', true); return; }
+    call(act === 'pagar' ? 'pagarConta' : 'pagarFatura', id, v);
+  }
+  if (act === 'desfazer' || act === 'desfazerFat') {
+    if (confirm('Desfazer o pagamento de ' + t.getAttribute('data-nome') + '?')) call(act === 'desfazer' ? 'desfazerConta' : 'desfazerFatura', id);
+  }
+  if (act === 'limpar-fat') call('definirFatura', id, t.getAttribute('data-ciclo'), '');
+  if (act === 'efetivar') {
+    var lv = parse(val('pl-' + t.getAttribute('data-linha')));
+    if (lv === '' || isNaN(lv)) { toast('Valor inválido', true); return; }
+    call('efetivar', t.getAttribute('data-linha'), lv);
+  }
+  if (act === 'lexc') {
+    var parc = t.getAttribute('data-parc') === '1';
+    if (confirm(parc ? 'Excluir esta compra e todas as parcelas dela?' : 'Excluir este lançamento?')) call('excluirLancamento', t.getAttribute('data-linha'), parc);
+  }
+  if (act === 'editar') folhaConta(id);
+  if (act === 'salvar-conta') salvarConta(id);
+  if (act === 'excluir-conta') {
+    if (confirm('Excluir esta conta? Os pagamentos já lançados continuam guardados.')) call('excluirConta', id);
+  }
+  if (act === 'obj-edit') folhaObjetivo(id);
+  if (act === 'obj-salvar') salvarObjetivo(id);
+  if (act === 'obj-excluir') { if (confirm('Excluir esta meta?')) call('excluirObjetivo', id); }
+  if (act === 'obj-dep') folhaDeposito(id);
+  if (act === 'obj-guardar') movimentarObjetivo(id, 1);
+  if (act === 'obj-retirar') movimentarObjetivo(id, -1);
+  if (act === 'fechar') fechar();
+  if (act === 'simular') folhaSimulador();
+  if (act === 'sim-limpar') { SIM = null; folhaSimulador(); }
+});
+
+document.addEventListener('change', function (ev) {
+  var t = ev.target, act = t.getAttribute('data-act');
+  if (act === 'cfg') {
+    var n = parse(t.value);
+    if (n === '' || isNaN(n)) { toast('Valor inválido', true); return; }
+    call('salvarConfig', t.getAttribute('data-campo'), n);
+  }
+  if (act === 'aj-conta' || act === 'aj-fatura') {
+    var v = parse(t.value);
+    if (v !== '' && isNaN(v)) { toast('Valor inválido', true); return; }
+    if (act === 'aj-conta') call('ajustarConta', t.getAttribute('data-id'), v);
+    else call('definirFatura', t.getAttribute('data-id'), t.getAttribute('data-ciclo'), v);
+  }
+  if (t.id === 'f-sit') { folhaLancar(); return; }
+  if (t.id === 'f-cartao' || t.id === 'f-parc' || t.id === 'f-data') previa();
+  if (t.id === 'v-dia' || t.id === 'v-seg') previaVenc();
+  if (t.id === 'p-data') previaPlan();
+  calcSim();
+});
+document.addEventListener('input', function (ev) {
+  var id = ev.target.id;
+  if (id === 'f-valor' || id === 'f-data') previa();
+  if (id === 'v-dia') previaVenc();
+  if (id === 'p-data') previaPlan();
+  calcSim();
+});
+document.addEventListener('keydown', function (ev) {
+  if (ev.key === 'Escape' && FOLHA) fecharFolha();
+  if (ev.key === 'Enter' && ev.target.classList && ev.target.classList.contains('link')) ev.target.click();
+  if (ev.key === 'Enter' && ev.target.tagName === 'INPUT' && ev.target.getAttribute('data-act')) ev.target.blur();
+});
+
+document.getElementById('b-atualizar').innerHTML = ico('atualizar', 18);
+document.getElementById('b-ajustes').innerHTML = ico('ajustes', 18);
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
+}
+load();
+</script>
+</body>
+</html>
