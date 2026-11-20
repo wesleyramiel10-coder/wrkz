@@ -1,0 +1,934 @@
+/**
+ * Contas Wesley v10 - servidor do painel + API do aplicativo + backup no Drive.
+ * Lê e grava na planilha. Todas as contas são feitas aqui; a planilha guarda só os dados.
+ * Na primeira execução, cria sozinho a aba Objetivos e atualiza a lista de tipos da aba Lançamentos.
+ *
+ * Novidade da v9:
+ * - doGet: o painel antigo só abre para o dono do script (você). Qualquer outra pessoa vê "Acesso restrito".
+ * - doPost: API para o aplicativo (GitHub Pages). Só responde se receber a chave secreta certa.
+ * - A chave fica guardada nas Propriedades do script, nunca no código.
+ *   Para criar: rode gerarChave() uma vez e copie a chave do Registro de execução.
+ *
+ * Novidade da v10:
+ * - Backup automático: rode instalarBackup() uma vez. Todo dia, de madrugada, uma cópia da planilha vai para a
+ *   pasta "Contas Wesley - Backups" no seu Drive. Ficam as 30 cópias mais recentes.
+ * - Envio sem duplicar: cada alteração do app chega com um ID único. Se a internet cair no meio e o app mandar
+ *   de novo, o servidor reconhece o ID e não lança duas vezes.
+ */
+const ABA = { config: 'Config', contas: 'Contas', cartoes: 'Cartões', lanc: 'Lançamentos', hist: 'Histórico', obj: 'Objetivos' };
+const CFG_EDITAVEL = ['Salário líquido', 'Saldo antes do salário', 'Limite da conta',
+  'Reserva já guardada', 'Meta da reserva (meses)'];
+const LISTA_CATEGORIAS = ['Moradia', 'Alimentação', 'Transporte', 'Saúde', 'Educação', 'Pessoal',
+  'Lazer', 'Compras', 'Dívidas', 'Dízimo', 'Pets', 'Reserva', 'Outros'];
+const TIPOS_LANC = ['Conta fixa', 'Fatura', 'Gasto', 'Entrada', 'Cartão',
+  'Ajuste conta', 'Fatura informada', 'Planejado', 'A receber'];
+const MESES_PROJECAO = 6;
+const MES_CURTO = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+const MES_LONGO = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho',
+  'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+
+function doGet() {
+  // O painel antigo só abre para o dono do script.
+  if (!ehDono_()) {
+    return HtmlService.createHtmlOutput('<p style="font-family:sans-serif;padding:24px">Acesso restrito.</p>')
+      .setTitle('Acesso restrito');
+  }
+  return HtmlService.createHtmlOutputFromFile('Index')
+    .setTitle('Contas Wesley')
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover');
+}
+
+function ehDono_() {
+  const quemAcessa = Session.getActiveUser().getEmail();
+  const dono = Session.getEffectiveUser().getEmail();
+  return !!quemAcessa && quemAcessa === dono;
+}
+
+// ---------- utilidades ----------
+
+let SS_ = null, TZ_ = null;
+function planilha_() {
+  if (!SS_) {
+    const id = PropertiesService.getScriptProperties().getProperty('SS_ID');
+    if (!id) throw new Error('Rode criarPlanilha() primeiro.');
+    SS_ = SpreadsheetApp.openById(id);
+    TZ_ = SS_.getSpreadsheetTimeZone();
+  }
+  return SS_;
+}
+function aba_(nome) { return planilha_().getSheetByName(nome); }
+
+// Os ciclos circulam como texto 'aaaa-mm' (ex.: '2026-12').
+function pad2_(n) { return String(n).padStart(2, '0'); }
+function chave_(d) { planilha_(); return Utilities.formatDate(new Date(d), TZ_, 'yyyy-MM'); }
+function dataDaChave_(k) { const p = k.split('-'); return new Date(Number(p[0]), Number(p[1]) - 1, 1, 12); }
+function somaCiclos_(k, n) {
+  const p = k.split('-').map(Number);
+  const t = p[0] * 12 + (p[1] - 1) + n;
+  return Math.floor(t / 12) + '-' + pad2_(t % 12 + 1);
+}
+function difCiclos_(a, b) {
+  const pa = a.split('-').map(Number), pb = b.split('-').map(Number);
+  return (pb[0] - pa[0]) * 12 + (pb[1] - pa[1]);
+}
+function nomeCiclo_(k) { const p = k.split('-'); return MES_CURTO[Number(p[1]) - 1] + '/' + p[0]; }
+function nomeLongo_(k) { return MES_LONGO[Number(k.split('-')[1]) - 1]; }
+
+// Datas do dia circulam como texto 'aaaa-mm-dd'.
+function hoje_() { planilha_(); return Utilities.formatDate(new Date(), TZ_, 'yyyy-MM-dd'); }
+function isoParaData_(iso) { const p = iso.split('-').map(Number); return new Date(p[0], p[1] - 1, p[2], 12); }
+function difDias_(a, b) {
+  const pa = a.split('-').map(Number), pb = b.split('-').map(Number);
+  return Math.round((Date.UTC(pb[0], pb[1] - 1, pb[2]) - Date.UTC(pa[0], pa[1] - 1, pa[2])) / 86400000);
+}
+function diaMes_(iso) { const p = iso.split('-'); return p[2] + '/' + p[1]; }
+
+// Primeiro dia útil do ciclo (pula sábado e domingo; feriados não entram).
+function diaUtil_(k) {
+  const p = k.split('-').map(Number);
+  for (let d = 1; d <= 7; d++) {
+    const semana = new Date(Date.UTC(p[0], p[1] - 1, d)).getUTCDay();
+    if (semana !== 0 && semana !== 6) return k + '-' + pad2_(d);
+  }
+}
+
+// Data 'aaaa-mm-dd' no ciclo k, ajustando o dia para o último dia do mês quando passar (ex.: 31 em fevereiro).
+function dataNoMes_(k, dia) {
+  const p = k.split('-').map(Number);
+  const ultimo = new Date(Date.UTC(p[0], p[1], 0)).getUTCDate();
+  return k + '-' + pad2_(Math.min(Math.max(1, dia), ultimo));
+}
+// Ciclo do salário a que uma data pertence: antes do 1º dia útil do mês, ainda é o ciclo do mês anterior.
+function cicloDaData_(iso) {
+  const k = iso.slice(0, 7);
+  return iso < diaUtil_(k) ? somaCiclos_(k, -1) : k;
+}
+// Vencimento de uma conta fixa no ciclo k (pode cair no mês seguinte e continuar contando neste ciclo).
+function dataConta_(k, dia, mesSeguinte) {
+  if (!dia) return '';
+  return dataNoMes_(mesSeguinte ? somaCiclos_(k, 1) : k, dia);
+}
+// Vencimento da fatura paga no ciclo k.
+function dataVencFatura_(k, venc) {
+  if (!venc) return '';
+  const d = dataNoMes_(k, venc);
+  return d >= diaUtil_(k) ? d : dataNoMes_(somaCiclos_(k, 1), venc);
+}
+
+function soma_(lista, f) { return lista.reduce((s, x) => s + f(x), 0); }
+function ultimo_(lista) { return lista.length ? lista[lista.length - 1] : null; }
+function vazio_(x) { return x === '' || x === null || x === undefined; }
+function num_(x) {
+  const n = Number(String(x).replace(',', '.'));
+  if (vazio_(x) || isNaN(n)) throw new Error('Valor inválido: ' + x);
+  return n;
+}
+function centavos_(n) { return Math.round(n * 100) / 100; }
+
+// ---------- atualização da planilha (roda uma vez só) ----------
+
+function migrar_() {
+  const props = PropertiesService.getScriptProperties();
+  const ss = planilha_();
+  if (!props.getProperty('MIGRADO_V7')) {
+    ss.getSheetByName(ABA.lanc).getRange('E2:E3000').setDataValidation(
+      SpreadsheetApp.newDataValidation().requireValueInList(TIPOS_LANC, true).build());
+    if (!ss.getSheetByName(ABA.obj)) {
+      const sh = ss.insertSheet(ABA.obj);
+      sh.getRange(1, 1, 1, 6).setValues([['ID', 'Objetivo', 'Alvo', 'Guardado', 'Prazo', 'Ativo']])
+        .setFontWeight('bold').setBackground('#e8edff');
+      sh.setFrozenRows(1);
+      sh.getRange('C2:D300').setNumberFormat('"R$" #,##0.00');
+      sh.getRange('E2:E300').setNumberFormat('mmm/yyyy');
+    }
+    props.setProperty('MIGRADO_V7', '1');
+  }
+  if (!props.getProperty('MIGRADO_V8')) {
+    // Coluna K da aba Contas: a conta vence no mês seguinte, mas é paga com o salário do ciclo.
+    ss.getSheetByName(ABA.contas).getRange('K1').setValue('Vence no mês seguinte')
+      .setFontWeight('bold').setBackground('#e8edff');
+    props.setProperty('MIGRADO_V8', '1');
+  }
+}
+
+// ---------- leitura ----------
+
+function lerConfig_() {
+  const c = {};
+  aba_(ABA.config).getDataRange().getValues().slice(1).forEach(r => {
+    if (r[0]) c[String(r[0]).trim()] = r[1];
+  });
+  return c;
+}
+
+function lerContas_() {
+  return aba_(ABA.contas).getDataRange().getValues().slice(1).map((r, i) => ({
+    linha: i + 2, id: String(r[0]), nome: String(r[1]), valor: Number(r[2]) || 0,
+    categoria: String(r[3]) || 'Outros', tipo: String(r[4]) || 'Gasto',
+    dia: vazio_(r[5]) ? '' : Number(r[5]),
+    inicio: r[6] ? chave_(r[6]) : '',
+    meses: vazio_(r[7]) ? '' : Number(r[7]),
+    ativa: r[8] === true, obs: String(r[9]), mesSeguinte: r[10] === true
+  })).filter(c => c.id && c.nome);
+}
+
+function lerCartoes_() {
+  return aba_(ABA.cartoes).getDataRange().getValues().slice(1).map((r, i) => ({
+    linha: i + 2, id: String(r[0]), nome: String(r[1]),
+    fech: Number(r[2]) || 0, venc: Number(r[3]) || 0, ativo: r[4] === true
+  })).filter(k => k.id && k.nome);
+}
+
+function lerLancamentos_() {
+  return aba_(ABA.lanc).getDataRange().getValues().slice(1).map((r, i) => ({
+    linha: i + 2,
+    data: r[0] ? Utilities.formatDate(new Date(r[0]), TZ_, 'yyyy-MM-dd') : '',
+    ciclo: r[1] ? chave_(r[1]) : '', desc: String(r[2]), valor: Number(r[3]) || 0,
+    tipo: String(r[4]), categoria: String(r[5]), ref: String(r[6]), parcela: String(r[7]), obs: String(r[8])
+  })).filter(l => l.ciclo && l.tipo);
+}
+
+function lerHistorico_() {
+  return aba_(ABA.hist).getDataRange().getValues().slice(1)
+    .filter(r => r[0])
+    .map(r => {
+      const k = chave_(r[0]);
+      return { ciclo: k, nome: nomeCiclo_(k), saldoInicial: Number(r[1]) || 0, salario: Number(r[2]) || 0,
+               entradas: Number(r[3]) || 0, fixas: Number(r[4]) || 0, faturas: Number(r[5]) || 0,
+               gastos: Number(r[6]) || 0, guardado: Number(r[7]) || 0,
+               resultado: Number(r[8]) || 0, saldoFinal: Number(r[9]) || 0 };
+    });
+}
+
+function lerObjetivos_() {
+  const sh = aba_(ABA.obj);
+  if (!sh) return [];
+  return sh.getDataRange().getValues().slice(1).map((r, i) => ({
+    linha: i + 2, id: String(r[0]), nome: String(r[1]), alvo: Number(r[2]) || 0, guardado: Number(r[3]) || 0,
+    prazo: r[4] ? chave_(r[4]) : '', ativo: r[5] !== false
+  })).filter(o => o.id && o.nome);
+}
+
+function contexto_() {
+  planilha_();
+  return { cfg: lerConfig_(), contas: lerContas_(), cartoes: lerCartoes_(), lancs: lerLancamentos_() };
+}
+
+// ---------- regras ----------
+
+function ativaNoCiclo_(c, k) {
+  if (!c.ativa || !c.inicio) return false;
+  const d = difCiclos_(c.inicio, k);
+  return d >= 0 && (c.meses === '' || d < c.meses);
+}
+
+// Em qual ciclo a compra no cartão será paga.
+function cicloDaCompra_(iso, cartao) {
+  const p = iso.split('-').map(Number);
+  const mesDaCompra = p[0] + '-' + pad2_(p[1]);
+  if (!cartao.fech || !cartao.venc) return somaCiclos_(mesDaCompra, 1);
+  const fecha = p[2] <= cartao.fech ? mesDaCompra : somaCiclos_(mesDaCompra, 1);
+  const mesVenc = cartao.venc > cartao.fech ? fecha : somaCiclos_(fecha, 1);
+  return cicloDaData_(dataNoMes_(mesVenc, cartao.venc));   // vencimento antes do salário conta no ciclo anterior
+}
+
+function calcularCiclo_(k, ctx) {
+  const doCiclo = ctx.lancs.filter(l => l.ciclo === k);
+
+  // Contas fixas: o "valor do mês" (Ajuste conta) substitui o valor padrão só neste ciclo.
+  const fixas = ctx.contas.filter(c => ativaNoCiclo_(c, k)).map(c => {
+    const pags = doCiclo.filter(l => l.tipo === 'Conta fixa' && l.ref === c.id);
+    const ajuste = ultimo_(doCiclo.filter(l => l.tipo === 'Ajuste conta' && l.ref === c.id));
+    return { id: c.id, nome: c.nome, categoria: c.categoria, tipo: c.tipo, dia: c.dia,
+             mesSeguinte: c.mesSeguinte, venc: dataConta_(k, c.dia, c.mesSeguinte), padrao: c.valor, ajustado: !!ajuste, previsto: ajuste ? ajuste.valor : c.valor,
+             pago: soma_(pags, l => l.valor), ok: pags.length > 0 };
+  });
+
+  // Faturas: o valor informado por você substitui a soma das compras lançadas.
+  const faturas = ctx.cartoes.map(k2 => {
+    const compras = doCiclo.filter(l => l.tipo === 'Cartão' && l.ref === k2.id);
+    const pags = doCiclo.filter(l => l.tipo === 'Fatura' && l.ref === k2.id);
+    const inf = ultimo_(doCiclo.filter(l => l.tipo === 'Fatura informada' && l.ref === k2.id));
+    const lancado = centavos_(soma_(compras, l => l.valor));
+    return { id: k2.id, nome: k2.nome, dia: k2.venc, venc: dataVencFatura_(k, k2.venc), qtd: compras.length, lancado: lancado,
+             informado: inf ? inf.valor : null, previsto: inf ? inf.valor : lancado,
+             parcelas: centavos_(soma_(compras.filter(l => l.parcela), l => l.valor)),
+             pago: soma_(pags, l => l.valor), ok: pags.length > 0 };
+  }).filter(f => f.previsto > 0 || f.ok || f.informado !== null);
+
+  const item = l => ({ linha: l.linha, desc: l.desc, valor: l.valor, categoria: l.categoria, iso: l.data, data: l.data ? diaMes_(l.data) : '' });
+  const planejados = doCiclo.filter(l => l.tipo === 'Planejado').map(item);
+  const aReceber = doCiclo.filter(l => l.tipo === 'A receber').map(item);
+  const gastos = doCiclo.filter(l => l.tipo === 'Gasto');
+  const entradas = doCiclo.filter(l => l.tipo === 'Entrada');
+  const reservas = fixas.filter(f => f.tipo === 'Reserva');
+
+  return {
+    chave: k, nome: nomeCiclo_(k), mes: nomeLongo_(k), fixas: fixas, faturas: faturas,
+    planejados: planejados, aReceber: aReceber,
+    fixasPrevisto: soma_(fixas, f => f.previsto),
+    fixasPago: soma_(fixas, f => f.pago),
+    faltaFixas: soma_(fixas.filter(f => !f.ok), f => f.previsto),
+    faturasPrevisto: soma_(faturas, f => f.previsto),
+    faturasPago: soma_(faturas, f => f.pago),
+    faltaFaturas: soma_(faturas.filter(f => !f.ok), f => f.previsto),
+    parcelasCartao: soma_(faturas, f => f.parcelas),
+    faltaPlanejados: soma_(planejados, l => l.valor),
+    totalAReceber: soma_(aReceber, l => l.valor),
+    totalGastos: soma_(gastos, l => l.valor),
+    totalEntradas: soma_(entradas, l => l.valor),
+    guardadoPago: soma_(reservas, f => f.pago),
+    guardadoPrevisto: soma_(reservas, f => f.ok ? f.pago : f.previsto)
+  };
+}
+
+// Para onde vai o dinheiro do ciclo. A fatura é dividida pelas categorias das compras;
+// o que passar do total lançado aparece como "Cartão".
+function categorias_(k, ctx, c) {
+  const total = {};
+  const add = (nome, v) => { if (v > 0) total[nome] = centavos_((total[nome] || 0) + v); };
+  const doCiclo = ctx.lancs.filter(l => l.ciclo === k);
+  const catDe = {};
+  ctx.contas.forEach(x => { catDe[x.id] = x.categoria; });
+
+  doCiclo.forEach(l => {
+    if (l.tipo === 'Conta fixa') add(catDe[l.ref] || l.categoria || 'Outros', l.valor);
+    if (l.tipo === 'Gasto') add(l.categoria || 'Outros', l.valor);
+  });
+  if (c) {
+    c.fixas.filter(f => !f.ok).forEach(f => add(f.categoria, f.previsto));
+    c.planejados.forEach(p => add(p.categoria || 'Outros', p.valor));
+  }
+  ctx.cartoes.forEach(k2 => {
+    const compras = doCiclo.filter(l => l.tipo === 'Cartão' && l.ref === k2.id);
+    const pagos = doCiclo.filter(l => l.tipo === 'Fatura' && l.ref === k2.id);
+    const lancado = soma_(compras, l => l.valor);
+    let valor = 0;
+    if (pagos.length) valor = soma_(pagos, l => l.valor);
+    else if (c) { const f = c.faturas.find(x => x.id === k2.id); valor = f ? f.previsto : 0; }
+    if (!valor) return;
+    if (!lancado) { add('Cartão', valor); return; }
+    const base = Math.min(valor, lancado);
+    compras.forEach(l => add(l.categoria || 'Outros', l.valor / lancado * base));
+    if (valor > lancado) add('Cartão', valor - lancado);
+  });
+  return total;
+}
+
+function ordenarPorData_(a, b) { return b.data > a.data ? 1 : b.data < a.data ? -1 : b.linha - a.linha; }
+
+// ---------- tudo o que a tela precisa ----------
+
+function getDados() {
+  migrar_();
+  const ctx = contexto_(), cfg = ctx.cfg, hist = lerHistorico_();
+  const k = chave_(cfg['Ciclo aberto']), kProx = somaCiclos_(k, 1);
+  const c = calcularCiclo_(k, ctx);
+
+  // Saldo e livre do ciclo
+  const salario = Number(cfg['Salário líquido']) || 0;
+  const saldoInicial = hist.length ? hist[hist.length - 1].saldoFinal : (Number(cfg['Saldo antes do salário']) || 0);
+  const saldoAgora = saldoInicial + salario + c.totalEntradas - c.fixasPago - c.faturasPago - c.totalGastos;
+  const faltaPagar = c.faltaFixas + c.faltaFaturas + c.faltaPlanejados;
+  const livre = saldoAgora - faltaPagar;
+
+  // Dias até o próximo salário
+  const hoje = hoje_(), inicio = diaUtil_(k), proxSalario = diaUtil_(kProx);
+  const diasTotal = Math.max(1, difDias_(inicio, proxSalario));
+  const dias = Math.max(0, Math.min(diasTotal, difDias_(hoje, proxSalario)));
+
+  // Limite da conta
+  const limite = Number(cfg['Limite da conta']) || 0;
+  const limiteUsado = saldoAgora < 0 ? -saldoAgora : 0;
+
+  // Extrato do ciclo: só o que entrou e saiu da conta de verdade
+  const extrato = ctx.lancs.filter(l => l.ciclo === k && ['Conta fixa', 'Fatura', 'Gasto', 'Entrada'].indexOf(l.tipo) >= 0)
+    .sort(ordenarPorData_)
+    .map(l => ({ linha: l.linha, data: l.data ? diaMes_(l.data) : '', desc: l.desc, valor: l.valor,
+                 tipo: l.tipo, categoria: l.categoria, entrada: l.tipo === 'Entrada',
+                 removivel: l.tipo === 'Gasto' || l.tipo === 'Entrada' }));
+
+  // Projeção dos próximos ciclos
+  const projecao = [];
+  let acumulado = livre + c.totalAReceber, prox = null;
+  for (let i = 1; i <= MESES_PROJECAO; i++) {
+    const ki = somaCiclos_(k, i), ci = calcularCiclo_(ki, ctx);
+    if (i === 1) prox = ci;
+    const extras = ci.totalEntradas + ci.totalAReceber;
+    const sai = ci.fixasPrevisto + ci.faturasPrevisto + ci.faltaPlanejados + ci.totalGastos;
+    const resultado = salario + extras - sai;
+    acumulado += resultado;
+    const eventos = [];
+    ctx.contas.forEach(x => {
+      if (x.ativa && x.meses !== '' && x.inicio && somaCiclos_(x.inicio, x.meses - 1) === ki)
+        eventos.push({ tipo: 'fim', txt: 'Última parcela de ' + x.nome, valor: x.valor });
+    });
+    ci.planejados.forEach(p => eventos.push({ tipo: 'sai', txt: p.desc, valor: p.valor }));
+    ci.aReceber.forEach(p => eventos.push({ tipo: 'entra', txt: p.desc, valor: p.valor }));
+    projecao.push({ chave: ki, nome: ci.nome, mes: ci.mes, salario: salario, extras: extras,
+                    fixas: ci.fixasPrevisto, cartao: ci.faturasPrevisto, planejados: ci.faltaPlanejados + ci.totalGastos,
+                    resultado: resultado, livre: acumulado, eventos: eventos });
+  }
+
+  // Cartões: fatura deste ciclo, a próxima e as compras lançadas
+  const vazioFat = { previsto: 0, lancado: 0, informado: null, pago: 0, ok: false };
+  const cartoes = ctx.cartoes.map(k2 => {
+    const doCartao = ctx.lancs.filter(l => l.tipo === 'Cartão' && l.ref === k2.id);
+    return {
+      id: k2.id, nome: k2.nome, fech: k2.fech, venc: k2.venc, ativo: k2.ativo,
+      atual: c.faturas.find(f => f.id === k2.id) || vazioFat,
+      proxima: prox.faturas.find(f => f.id === k2.id) || vazioFat,
+      depois: centavos_(soma_(doCartao.filter(l => difCiclos_(kProx, l.ciclo) > 0), l => l.valor)),
+      compras: doCartao.filter(l => difCiclos_(k, l.ciclo) >= 0).sort(ordenarPorData_).slice(0, 40)
+        .map(l => ({ linha: l.linha, data: l.data ? diaMes_(l.data) : '', desc: l.desc, valor: l.valor,
+                     categoria: l.categoria, parcela: l.parcela, ciclo: nomeCiclo_(l.ciclo) }))
+    };
+  });
+
+  // Dívidas: contas fixas com número de ciclos definido
+  const dividas = ctx.contas.filter(x => x.meses !== '' && x.inicio).map(x => {
+    const antes = Math.max(0, Math.min(x.meses, difCiclos_(x.inicio, k)));
+    const agora = c.fixas.some(f => f.id === x.id && f.ok) ? 1 : 0;
+    const pagas = Math.min(x.meses, antes + agora);
+    return { id: x.id, nome: x.nome, valor: x.valor, meses: x.meses, pagas: pagas, faltam: x.meses - pagas,
+             totalFalta: (x.meses - pagas) * x.valor, fim: nomeCiclo_(somaCiclos_(x.inicio, x.meses - 1)) };
+  });
+
+  // Reserva, saúde financeira e metas
+  const custoFixo = soma_(c.fixas.filter(f => f.tipo !== 'Reserva'), f => f.previsto);
+  const metaMeses = Number(cfg['Meta da reserva (meses)']) || 3;
+  const reservaHoje = (Number(cfg['Reserva já guardada']) || 0) + soma_(hist, h => h.guardado) + c.guardadoPago;
+  const alvo = metaMeses * custoFixo;
+  const objetivos = lerObjetivos_().map(o => {
+    const falta = Math.max(0, o.alvo - o.guardado);
+    const meses = o.prazo ? Math.max(1, difCiclos_(k, o.prazo) + 1) : 0;
+    return Object.assign({}, o, { falta: falta, mesesRestantes: meses, porMes: meses ? falta / meses : 0,
+                                  pct: o.alvo ? Math.min(1, o.guardado / o.alvo) : 0, prazoNome: o.prazo ? nomeCiclo_(o.prazo) : '' });
+  });
+
+  const config = {};
+  CFG_EDITAVEL.forEach(campo => { config[campo] = vazio_(cfg[campo]) ? '' : cfg[campo]; });
+
+  return {
+    hoje: hoje,
+    ciclo: { chave: k, nome: c.nome, mes: c.mes, inicio: diaMes_(inicio), proxSalario: diaMes_(proxSalario),
+             dias: dias, diasTotal: diasTotal },
+    saldoInicial: saldoInicial, salario: salario, entradas: c.totalEntradas, aReceber: c.totalAReceber,
+    saldoAgora: saldoAgora, faltaPagar: faltaPagar, livre: livre,
+    porDia: dias > 0 && livre > 0 ? livre / dias : 0,
+    limite: limite, limiteUsado: limiteUsado, limiteDisponivel: limite - limiteUsado,
+    fixas: c.fixas, faturas: c.faturas, planejados: c.planejados, recebiveis: c.aReceber,
+    prox: { fixas: prox.fixas, faturas: prox.faturas, planejados: prox.planejados, recebiveis: prox.aReceber },
+    totais: { fixasPrevisto: c.fixasPrevisto, fixasPago: c.fixasPago, faltaFixas: c.faltaFixas,
+              faturasPrevisto: c.faturasPrevisto, faltaFaturas: c.faltaFaturas, planejados: c.faltaPlanejados,
+              gastos: c.totalGastos, guardado: c.guardadoPrevisto },
+    categorias: categorias_(k, ctx, c),
+    extrato: extrato,
+    proximo: Object.assign({ sobra: livre + c.totalAReceber }, projecao[0]),
+    projecao: projecao,
+    cartoes: cartoes, contas: ctx.contas, dividas: dividas,
+    reserva: { hoje: reservaHoje, meses: metaMeses, alvo: alvo, pct: alvo ? Math.min(1, reservaHoje / alvo) : 0 },
+    saude: { salario: salario, custoFixo: custoFixo,
+             dividas: soma_(c.fixas.filter(f => f.categoria === 'Dívidas'), f => f.previsto) + c.parcelasCartao,
+             poupanca: c.guardadoPrevisto, reservaMeses: custoFixo ? reservaHoje / custoFixo : 0 },
+    objetivos: objetivos,
+    historico: hist.map(h => Object.assign({}, h, { categorias: categorias_(h.ciclo, ctx, null) })),
+    config: config, listaCategorias: LISTA_CATEGORIAS
+  };
+}
+
+// ---------- escrita ----------
+
+function comLock_(fn) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try { fn(); SpreadsheetApp.flush(); } finally { lock.releaseLock(); }
+  return getDados();
+}
+
+function cicloAberto_() { return chave_(lerConfig_()['Ciclo aberto']); }
+
+function setConfig_(campo, valor) {
+  const sh = aba_(ABA.config);
+  const v = sh.getRange(1, 1, sh.getLastRow(), 1).getValues();
+  const i = v.findIndex(r => String(r[0]).trim() === campo);
+  if (i < 0) { sh.appendRow([campo, valor, '']); return; }
+  sh.getRange(i + 1, 2).setValue(valor);
+}
+
+function salvarConfig(campo, valor) {
+  return comLock_(() => {
+    if (CFG_EDITAVEL.indexOf(campo) < 0) throw new Error('Campo não editável: ' + campo);
+    setConfig_(campo, num_(valor));
+  });
+}
+
+function apagarLinhas_(linhas) {
+  const sh = aba_(ABA.lanc);
+  linhas.sort((a, b) => b - a).forEach(linha => sh.deleteRow(linha));   // de baixo para cima
+}
+
+function pagarConta(id, valor) {
+  return comLock_(() => {
+    const k = cicloAberto_();
+    const c = lerContas_().find(x => x.id === id);
+    if (!c) throw new Error('Conta não encontrada.');
+    aba_(ABA.lanc).appendRow([new Date(), dataDaChave_(k), c.nome, num_(valor), 'Conta fixa', c.categoria, id, '', '']);
+  });
+}
+
+function desfazerConta(id) {
+  return comLock_(() => {
+    const k = cicloAberto_();
+    apagarLinhas_(lerLancamentos_().filter(l => l.ciclo === k && l.tipo === 'Conta fixa' && l.ref === id).map(l => l.linha));
+  });
+}
+
+// Valor do mês de uma conta fixa (vale só para o ciclo aberto). Igual ao padrão = remove o ajuste.
+function ajustarConta(id, valor) {
+  return comLock_(() => {
+    const k = cicloAberto_();
+    const c = lerContas_().find(x => x.id === id);
+    if (!c) throw new Error('Conta não encontrada.');
+    apagarLinhas_(lerLancamentos_().filter(l => l.ciclo === k && l.tipo === 'Ajuste conta' && l.ref === id).map(l => l.linha));
+    if (vazio_(valor)) return;
+    const v = num_(valor);
+    if (Math.abs(v - c.valor) < 0.005) return;
+    aba_(ABA.lanc).appendRow([new Date(), dataDaChave_(k), 'Valor do mês: ' + c.nome, v, 'Ajuste conta', c.categoria, id, '', '']);
+  });
+}
+
+function pagarFatura(id, valor) {
+  return comLock_(() => {
+    const k = cicloAberto_();
+    const cartao = lerCartoes_().find(x => x.id === id);
+    if (!cartao) throw new Error('Cartão não encontrado.');
+    aba_(ABA.lanc).appendRow([new Date(), dataDaChave_(k), 'Fatura ' + cartao.nome, num_(valor), 'Fatura', '', id, '', '']);
+  });
+}
+
+function desfazerFatura(id) {
+  return comLock_(() => {
+    const k = cicloAberto_();
+    apagarLinhas_(lerLancamentos_().filter(l => l.ciclo === k && l.tipo === 'Fatura' && l.ref === id).map(l => l.linha));
+  });
+}
+
+// Valor atual da fatura, como aparece no app do banco. Vazio = volta a usar a soma das compras lançadas.
+function definirFatura(id, ciclo, valor) {
+  return comLock_(() => {
+    const aberto = cicloAberto_();
+    const k = ciclo || aberto;
+    if (difCiclos_(aberto, k) < 0) throw new Error('Esse ciclo já foi fechado.');
+    const cartao = lerCartoes_().find(x => x.id === id);
+    if (!cartao) throw new Error('Cartão não encontrado.');
+    apagarLinhas_(lerLancamentos_().filter(l => l.ciclo === k && l.tipo === 'Fatura informada' && l.ref === id).map(l => l.linha));
+    if (vazio_(valor)) return;
+    aba_(ABA.lanc).appendRow([new Date(), dataDaChave_(k), 'Valor informado da fatura ' + cartao.nome, num_(valor),
+                              'Fatura informada', '', id, '', '']);
+  });
+}
+
+// l = { tipo, desc, valor, categoria, data ('aaaa-mm-dd'), situacao ('pago' ou 'pendente'), cartao, parcelas }
+// Pendente: vira planejado (gasto) ou a receber (entrada) no ciclo do salário da data de vencimento.
+function lancar(l) {
+  return comLock_(() => {
+    const desc = String(l.desc || '').trim();
+    if (!desc) throw new Error('Informe a descrição.');
+    if (['Gasto', 'Entrada', 'Cartão'].indexOf(l.tipo) < 0) throw new Error('Tipo inválido.');
+    const valor = num_(l.valor);
+    if (valor <= 0) throw new Error('O valor precisa ser maior que zero.');
+
+    const aberto = cicloAberto_();
+    const iso = l.data || hoje_();
+    const data = isoParaData_(iso);
+    const sh = aba_(ABA.lanc);
+    const cat = l.tipo === 'Entrada' ? '' : (l.categoria || 'Outros');
+
+    if (l.tipo !== 'Cartão') {
+      if (l.situacao === 'pendente') {
+        const doVenc = cicloDaData_(iso);
+        const k = difCiclos_(aberto, doVenc) < 0 ? aberto : doVenc;
+        sh.appendRow([data, dataDaChave_(k), desc, valor, l.tipo === 'Gasto' ? 'Planejado' : 'A receber', cat, '', '', '']);
+      } else {
+        sh.appendRow([data, dataDaChave_(aberto), desc, valor, l.tipo, cat, '', '', '']);
+      }
+      return;
+    }
+
+    const cartao = lerCartoes_().find(x => x.id === l.cartao);
+    if (!cartao) throw new Error('Escolha o cartão.');
+    const n = Math.max(1, Math.min(48, Math.round(Number(l.parcelas) || 1)));
+    let primeiro = cicloDaCompra_(iso, cartao);
+    if (difCiclos_(aberto, primeiro) < 0) primeiro = aberto;   // nunca cai num ciclo já fechado
+
+    const parcela = centavos_(valor / n);
+    const linhas = [];
+    for (let i = 0; i < n; i++) {
+      const v = i === n - 1 ? centavos_(valor - parcela * (n - 1)) : parcela;
+      linhas.push([data, dataDaChave_(somaCiclos_(primeiro, i)), desc, v, 'Cartão',
+                   cat, cartao.id, n > 1 ? (i + 1) + '/' + n : '', '']);
+    }
+    sh.getRange(sh.getLastRow() + 1, 1, linhas.length, 9).setValues(linhas);
+  });
+}
+
+// Transforma um planejado em gasto (ou um "a receber" em entrada) no ciclo aberto.
+function efetivar(linha, valor) {
+  return comLock_(() => {
+    linha = Number(linha);
+    const l = lerLancamentos_().find(x => x.linha === linha);
+    if (!l || (l.tipo !== 'Planejado' && l.tipo !== 'A receber')) throw new Error('Lançamento não encontrado.');
+    const k = cicloAberto_();
+    aba_(ABA.lanc).getRange(linha, 1, 1, 5).setValues([[new Date(), dataDaChave_(k), l.desc, num_(valor),
+      l.tipo === 'Planejado' ? 'Gasto' : 'Entrada']]);
+  });
+}
+
+// Apaga um lançamento. Com todas = true, apaga também as outras parcelas da mesma compra.
+function excluirLancamento(linha, todas) {
+  return comLock_(() => {
+    linha = Number(linha);
+    const lancs = lerLancamentos_();
+    const alvo = lancs.find(l => l.linha === linha);
+    if (!alvo) throw new Error('Lançamento não encontrado.');
+    let linhas = [linha];
+    if (todas && alvo.parcela) {
+      const total = alvo.parcela.split('/')[1];
+      linhas = lancs.filter(l => l.tipo === 'Cartão' && l.desc === alvo.desc && l.ref === alvo.ref &&
+                                 l.data === alvo.data && l.parcela.split('/')[1] === total).map(l => l.linha);
+    }
+    apagarLinhas_(linhas);
+  });
+}
+
+// c = { id, nome, valor, categoria, tipo, dia, inicio ('aaaa-mm'), meses, ativa, obs }
+function salvarConta(c) {
+  return comLock_(() => {
+    if (!String(c.nome || '').trim()) throw new Error('Informe o nome da conta.');
+    const lista = lerContas_();
+    let id = c.id, linha;
+    if (id) {
+      const atual = lista.find(x => x.id === id);
+      if (!atual) throw new Error('Conta não encontrada.');
+      linha = atual.linha;
+    } else {
+      const nums = lista.map(x => Number(x.id.replace(/\D/g, '')) || 0);
+      id = 'C' + pad2_(Math.max.apply(null, [0].concat(nums)) + 1);
+      linha = lista.length ? Math.max.apply(null, lista.map(x => x.linha)) + 1 : 2;
+    }
+    const inicio = c.inicio || cicloAberto_();
+    aba_(ABA.contas).getRange(linha, 1, 1, 11).setValues([[
+      id, String(c.nome).trim(), num_(c.valor), c.categoria || 'Outros',
+      c.tipo === 'Reserva' ? 'Reserva' : 'Gasto',
+      vazio_(c.dia) ? '' : num_(c.dia), dataDaChave_(inicio),
+      vazio_(c.meses) ? '' : num_(c.meses), c.ativa !== false, String(c.obs || ''), c.mesSeguinte === true
+    ]]);
+  });
+}
+
+function excluirConta(id) {
+  return comLock_(() => {
+    const c = lerContas_().find(x => x.id === id);
+    if (!c) throw new Error('Conta não encontrada.');
+    aba_(ABA.contas).deleteRow(c.linha);
+  });
+}
+
+// ---------- vencimentos ----------
+
+// Dia de vencimento de uma conta fixa e se ele cai no mês seguinte (pago com o salário do ciclo).
+function salvarVencimento(id, dia, mesSeguinte) {
+  return comLock_(() => {
+    migrar_();
+    const c = lerContas_().find(x => x.id === id);
+    if (!c) throw new Error('Conta não encontrada.');
+    const d = vazio_(dia) ? '' : Math.round(num_(dia));
+    if (d !== '' && (d < 1 || d > 31)) throw new Error('O dia precisa estar entre 1 e 31.');
+    const sh = aba_(ABA.contas);
+    sh.getRange(c.linha, 6).setValue(d);
+    sh.getRange(c.linha, 11).setValue(mesSeguinte === true);
+  });
+}
+
+// Dias de fechamento e vencimento de um cartão.
+function salvarCartao(id, fech, venc) {
+  return comLock_(() => {
+    const k = lerCartoes_().find(x => x.id === id);
+    if (!k) throw new Error('Cartão não encontrado.');
+    const f = Math.round(num_(fech)), v = Math.round(num_(venc));
+    if (f < 1 || f > 31 || v < 1 || v > 31) throw new Error('Os dias precisam estar entre 1 e 31.');
+    aba_(ABA.cartoes).getRange(k.linha, 3, 1, 2).setValues([[f, v]]);
+  });
+}
+
+// Edita um planejado ou um valor a receber. O ciclo é recalculado pela nova data de vencimento.
+// o = { desc, valor, data ('aaaa-mm-dd'), categoria }
+function editarLancamento(linha, o) {
+  return comLock_(() => {
+    linha = Number(linha);
+    const l = lerLancamentos_().find(x => x.linha === linha);
+    if (!l || (l.tipo !== 'Planejado' && l.tipo !== 'A receber')) throw new Error('Lançamento não encontrado.');
+    const desc = String(o.desc || '').trim();
+    if (!desc) throw new Error('Informe a descrição.');
+    const v = num_(o.valor);
+    if (v <= 0) throw new Error('O valor precisa ser maior que zero.');
+    const iso = o.data || l.data || hoje_();
+    const aberto = cicloAberto_(), doVenc = cicloDaData_(iso);
+    const k = difCiclos_(aberto, doVenc) < 0 ? aberto : doVenc;
+    const sh = aba_(ABA.lanc);
+    sh.getRange(linha, 1, 1, 4).setValues([[isoParaData_(iso), dataDaChave_(k), desc, v]]);
+    if (l.tipo === 'Planejado' && o.categoria) sh.getRange(linha, 6).setValue(o.categoria);
+  });
+}
+
+// ---------- metas (aba Objetivos) ----------
+
+// o = { id, nome, alvo, guardado, prazo ('aaaa-mm' ou vazio), ativo }
+function salvarObjetivo(o) {
+  return comLock_(() => {
+    migrar_();
+    if (!String(o.nome || '').trim()) throw new Error('Informe o nome da meta.');
+    const alvo = num_(o.alvo);
+    if (alvo <= 0) throw new Error('O valor da meta precisa ser maior que zero.');
+    const lista = lerObjetivos_();
+    let id = o.id, linha;
+    if (id) {
+      const atual = lista.find(x => x.id === id);
+      if (!atual) throw new Error('Meta não encontrada.');
+      linha = atual.linha;
+    } else {
+      const nums = lista.map(x => Number(x.id.replace(/\D/g, '')) || 0);
+      id = 'M' + pad2_(Math.max.apply(null, [0].concat(nums)) + 1);
+      linha = lista.length ? Math.max.apply(null, lista.map(x => x.linha)) + 1 : 2;
+    }
+    aba_(ABA.obj).getRange(linha, 1, 1, 6).setValues([[
+      id, String(o.nome).trim(), alvo, vazio_(o.guardado) ? 0 : num_(o.guardado),
+      o.prazo ? dataDaChave_(o.prazo) : '', o.ativo !== false
+    ]]);
+  });
+}
+
+function excluirObjetivo(id) {
+  return comLock_(() => {
+    const o = lerObjetivos_().find(x => x.id === id);
+    if (!o) throw new Error('Meta não encontrada.');
+    aba_(ABA.obj).deleteRow(o.linha);
+  });
+}
+
+// Guarda (valor positivo) ou retira (valor negativo) dinheiro de uma meta.
+// Com doSaldo = true, o valor também sai (ou volta) para o saldo do ciclo aberto.
+function depositarObjetivo(id, valor, doSaldo) {
+  return comLock_(() => {
+    const o = lerObjetivos_().find(x => x.id === id);
+    if (!o) throw new Error('Meta não encontrada.');
+    const v = num_(valor);
+    if (!v) throw new Error('Informe um valor.');
+    aba_(ABA.obj).getRange(o.linha, 4).setValue(centavos_(o.guardado + v));
+    if (doSaldo) {
+      const k = cicloAberto_();
+      if (v > 0) aba_(ABA.lanc).appendRow([new Date(), dataDaChave_(k), 'Meta: ' + o.nome, v, 'Gasto', 'Reserva', '', '', '']);
+      else aba_(ABA.lanc).appendRow([new Date(), dataDaChave_(k), 'Resgate da meta: ' + o.nome, -v, 'Entrada', '', '', '', '']);
+    }
+  });
+}
+
+// ---------- fechamento ----------
+
+function fecharCiclo() {
+  return comLock_(() => {
+    const ctx = contexto_(), hist = lerHistorico_();
+    const k = chave_(ctx.cfg['Ciclo aberto']);
+    if (hist.some(h => h.ciclo === k)) throw new Error(nomeCiclo_(k) + ' já está no Histórico.');
+
+    // No fechamento vale só o que foi pago de verdade.
+    const c = calcularCiclo_(k, ctx);
+    const salario = Number(ctx.cfg['Salário líquido']) || 0;
+    const saldoInicial = hist.length ? hist[hist.length - 1].saldoFinal : (Number(ctx.cfg['Saldo antes do salário']) || 0);
+    const resultado = salario + c.totalEntradas - c.fixasPago - c.faturasPago - c.totalGastos;
+
+    aba_(ABA.hist).appendRow([dataDaChave_(k), saldoInicial, salario, c.totalEntradas, c.fixasPago,
+      c.faturasPago, c.totalGastos, c.guardadoPago, resultado, saldoInicial + resultado, new Date()]);
+    setConfig_('Ciclo aberto', dataDaChave_(somaCiclos_(k, 1)));
+  });
+}
+
+// ---------- teste ----------
+
+function testar() {
+  const d = getDados();
+  Logger.log('Ciclo: ' + d.ciclo.nome + ' (de ' + d.ciclo.inicio + ' até o salário de ' + d.ciclo.proxSalario + ')');
+  Logger.log('Saldo na conta agora: ' + d.saldoAgora);
+  Logger.log('Falta pagar: ' + d.faltaPagar);
+  Logger.log('Livre até o próximo salário: ' + d.livre);
+  d.projecao.forEach(p => Logger.log('Projeção ' + p.nome + ': livre acumulado ' + Math.round(p.livre)));
+}
+
+
+// ---------- API do aplicativo (v9) ----------
+// O app envia um POST com o texto JSON: { "chave": "...", "fn": "nomeDaFuncao", "args": [ ... ] }
+// A resposta é sempre JSON: { "ok": true, "dados": ... } ou { "ok": false, "erro": "..." }
+
+const API_VERSAO = 10;
+
+// Só estas funções podem ser chamadas pelo app. Qualquer outro nome é recusado.
+const API_PERMITIDAS = ['getDados', 'salvarConfig', 'pagarConta', 'desfazerConta', 'ajustarConta',
+  'pagarFatura', 'desfazerFatura', 'definirFatura', 'lancar', 'efetivar', 'excluirLancamento',
+  'salvarConta', 'excluirConta', 'salvarVencimento', 'salvarCartao', 'editarLancamento',
+  'salvarObjetivo', 'excluirObjetivo', 'depositarObjetivo', 'fecharCiclo', 'statusBackup', 'backupAgora'];
+
+// Funções que só leem: não precisam de controle de duplicidade.
+const API_SO_LEITURA = ['getDados', 'statusBackup', 'backupAgora'];
+
+// Proteção contra tentativas de adivinhar a chave: 10 erros em 15 minutos bloqueiam a API por 15 minutos.
+const API_MAX_ERROS = 10;
+const API_JANELA_SEG = 900;
+
+function doPost(e) {
+  try {
+    const cache = CacheService.getScriptCache();
+    const erros = Number(cache.get('api_erros') || 0);
+    if (erros >= API_MAX_ERROS) return respostaApi_({ ok: false, erro: 'Muitas tentativas. Aguarde 15 minutos.' });
+
+    let pedido;
+    try { pedido = JSON.parse(e && e.postData ? e.postData.contents : ''); }
+    catch (x) { return respostaApi_({ ok: false, erro: 'Pedido inválido.' }); }
+
+    const chaveCerta = PropertiesService.getScriptProperties().getProperty('API_CHAVE');
+    if (!chaveCerta) return respostaApi_({ ok: false, erro: 'API sem chave. Rode gerarChave() no Apps Script.' });
+
+    if (!chaveIgual_(String(pedido.chave || ''), chaveCerta)) {
+      cache.put('api_erros', String(erros + 1), API_JANELA_SEG);
+      return respostaApi_({ ok: false, erro: 'Chave inválida.' });
+    }
+
+    const fn = String(pedido.fn || '');
+    if (fn === 'ping') return respostaApi_({ ok: true, dados: { versao: API_VERSAO, hora: new Date().toISOString() } });
+    if (API_PERMITIDAS.indexOf(fn) < 0) return respostaApi_({ ok: false, erro: 'Função não permitida: ' + fn });
+
+    const args = Array.isArray(pedido.args) ? pedido.args : [];
+    const id = String(pedido.id || '');
+    const controla = id && API_SO_LEITURA.indexOf(fn) < 0;
+
+    // Já recebido antes (a resposta se perdeu no caminho): não repete, só devolve os dados atuais.
+    if (controla && jaProcessado_(id)) return respostaApi_({ ok: true, dados: getDados(), repetido: true });
+
+    const dados = globalThis[fn].apply(null, args);
+    if (controla) marcarProcessado_(id);
+    return respostaApi_({ ok: true, dados: dados });
+  } catch (err) {
+    return respostaApi_({ ok: false, erro: err && err.message ? err.message : String(err) });
+  }
+}
+
+// Guarda os IDs das últimas 400 alterações recebidas.
+function jaProcessado_(id) {
+  const lista = JSON.parse(PropertiesService.getScriptProperties().getProperty('API_OPS') || '[]');
+  return lista.indexOf(id) >= 0;
+}
+function marcarProcessado_(id) {
+  const props = PropertiesService.getScriptProperties();
+  let lista = JSON.parse(props.getProperty('API_OPS') || '[]');
+  lista.push(id);
+  if (lista.length > 400) lista = lista.slice(-400);
+  props.setProperty('API_OPS', JSON.stringify(lista));
+}
+
+function respostaApi_(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
+}
+
+// Compara as chaves sempre no mesmo tempo (não dá pista de quantas letras acertou).
+function chaveIgual_(a, b) {
+  if (a.length !== b.length) return false;
+  let dif = 0;
+  for (let i = 0; i < a.length; i++) dif |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return dif === 0;
+}
+
+// Rode UMA vez para criar a chave. Rodar de novo troca a chave (a antiga para de funcionar).
+function gerarChave() {
+  const chave = (Utilities.getUuid() + Utilities.getUuid()).replace(/-/g, '');
+  PropertiesService.getScriptProperties().setProperty('API_CHAVE', chave);
+  CacheService.getScriptCache().remove('api_erros');
+  Logger.log('Sua chave secreta (copie e guarde em local seguro, não envie para ninguém):');
+  Logger.log(chave);
+}
+
+// Mostra a chave atual no Registro de execução, caso você precise digitar de novo no app.
+function mostrarChave() {
+  const chave = PropertiesService.getScriptProperties().getProperty('API_CHAVE');
+  Logger.log(chave ? chave : 'Ainda não existe chave. Rode gerarChave().');
+}
+
+// Teste rápido da API sem precisar do app: simula um pedido com a chave certa.
+function testarApi() {
+  const chave = PropertiesService.getScriptProperties().getProperty('API_CHAVE');
+  const r = doPost({ postData: { contents: JSON.stringify({ chave: chave, fn: 'ping' }) } });
+  Logger.log('ping: ' + r.getContent());
+  const r2 = doPost({ postData: { contents: JSON.stringify({ chave: 'errada', fn: 'ping' }) } });
+  Logger.log('chave errada: ' + r2.getContent());
+  CacheService.getScriptCache().remove('api_erros');
+}
+
+// ---------- backup no Drive (v10) ----------
+const BACKUP_PASTA = 'Contas Wesley - Backups';
+const BACKUP_MANTER = 30;
+
+function pastaBackup_() {
+  const props = PropertiesService.getScriptProperties();
+  const id = props.getProperty('BACKUP_PASTA_ID');
+  if (id) { try { const p = DriveApp.getFolderById(id); if (!p.isTrashed()) return p; } catch (e) {} }
+  const achou = DriveApp.getFoldersByName(BACKUP_PASTA);
+  const pasta = achou.hasNext() ? achou.next() : DriveApp.createFolder(BACKUP_PASTA);
+  props.setProperty('BACKUP_PASTA_ID', pasta.getId());
+  return pasta;
+}
+
+function fazerBackup_() {
+  const ss = planilha_();
+  const pasta = pastaBackup_();
+  const nome = ss.getName() + ' - backup ' + Utilities.formatDate(new Date(), TZ_, 'yyyy-MM-dd HH-mm');
+  DriveApp.getFileById(ss.getId()).makeCopy(nome, pasta);
+
+  // Mantém só as cópias mais recentes; as antigas vão para a lixeira do Drive.
+  const arquivos = [];
+  const it = pasta.getFiles();
+  while (it.hasNext()) arquivos.push(it.next());
+  arquivos.sort((a, b) => b.getDateCreated() - a.getDateCreated());
+  arquivos.slice(BACKUP_MANTER).forEach(f => f.setTrashed(true));
+
+  PropertiesService.getScriptProperties().setProperty('ULTIMO_BACKUP', new Date().toISOString());
+  return nome;
+}
+
+// Chamada pelo gatilho diário.
+function backupDiario() { fazerBackup_(); }
+
+// Rode UMA vez no editor: liga o backup diário (de madrugada) e já faz a primeira cópia.
+function instalarBackup() {
+  ScriptApp.getProjectTriggers()
+    .filter(t => t.getHandlerFunction() === 'backupDiario')
+    .forEach(t => ScriptApp.deleteTrigger(t));
+  ScriptApp.newTrigger('backupDiario').timeBased().everyDays(1).atHour(3).create();
+  const nome = fazerBackup_();
+  Logger.log('Backup diário ligado. Primeira cópia: ' + nome);
+  Logger.log('Pasta: ' + pastaBackup_().getUrl());
+}
+
+// Para o app: situação do backup.
+function statusBackup() {
+  const props = PropertiesService.getScriptProperties();
+  const automatico = ScriptApp.getProjectTriggers().some(t => t.getHandlerFunction() === 'backupDiario');
+  let pastaUrl = '';
+  const id = props.getProperty('BACKUP_PASTA_ID');
+  if (id) { try { pastaUrl = DriveApp.getFolderById(id).getUrl(); } catch (e) {} }
+  return { ultimo: props.getProperty('ULTIMO_BACKUP') || '', automatico: automatico, pastaUrl: pastaUrl, manter: BACKUP_MANTER };
+}
+
+// Para o app: botão "Fazer backup agora".
+function backupAgora() {
+  const nome = fazerBackup_();
+  return Object.assign(statusBackup(), { nome: nome });
+}

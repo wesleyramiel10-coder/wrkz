@@ -8,8 +8,8 @@
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#f3f4f7",
-  "theme_color": "#1f3b8f",
+  "background_color": "#f5f7fb",
+  "theme_color": "#f5f7fb",
   "icons": [
     { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
@@ -18,11 +18,22 @@
   "shortcuts": [
     { "name": "Novo gasto", "short_name": "Gasto", "url": "./?acao=gasto",
       "icons": [{ "src": "icon-192.png", "sizes": "192x192", "type": "image/png" }] },
-    { "name": "Compra no cartão", "short_name": "Cartão", "url": "./?acao=cartao",
+    { "name": "Ler boleto ou Pix", "short_name": "Ler código", "url": "./?acao=ler",
       "icons": [{ "src": "icon-192.png", "sizes": "192x192", "type": "image/png" }] },
-    { "name": "Nova entrada", "short_name": "Entrada", "url": "./?acao=entrada",
+    { "name": "Lançar falando", "short_name": "Falar", "url": "./?acao=voz",
       "icons": [{ "src": "icon-192.png", "sizes": "192x192", "type": "image/png" }] },
     { "name": "Agenda do ciclo", "short_name": "Agenda", "url": "./?pag=agenda",
       "icons": [{ "src": "icon-192.png", "sizes": "192x192", "type": "image/png" }] }
-  ]
+  ],
+  "share_target": {
+    "action": "./compartilhar",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url",
+      "files": [{ "name": "arquivo", "accept": ["image/*"] }]
+    }
+  }
 }
