@@ -144,6 +144,7 @@
   .cc { background:var(--cc); color:#fff; border-radius:20px; padding:18px 18px 16px; margin-bottom:12px; }
   .cc-top { display:flex; justify-content:space-between; align-items:center; font-size:15px; }
   .cc .ajuda { color:#fff; opacity:.85; }
+  .cc .btn { background:rgba(255,255,255,.14); border-color:rgba(255,255,255,.35); color:#fff; }
   .cc-label { font-size:13px; opacity:.85; margin-top:18px; }
   .cc-valor { font-size:30px; font-weight:800; letter-spacing:-1px; }
   .cc-rodape { font-size:12.5px; opacity:.8; margin-top:10px; }
@@ -829,6 +830,7 @@ function sairConexao() {
 }
 function apagarTudoLocal() {
   [COFRE, ERROS, 'wrkz_conexao', K_CACHE, K_FILA].forEach(function (k) { localStorage.removeItem(k); });
+  apagarSessao();
   CX = null; DKRAW = null; D = null; PENDENTE = null; CACHE = null; FILA = []; APRENDIDAS = {}; LOCAL_OK = false; MODO_OFF = false;
 }
 
@@ -1057,6 +1059,7 @@ function desativarBio() {
 // ----- bloqueio automático -----
 function tempoBloq() { var v = localStorage.getItem(PREF_BLOQ); return v === null ? 60000 : Number(v); }
 function travar(semBio) {
+  apagarSessao();
   if (!CX || !lerCofre()) return;
   CX = null; DKRAW = null; D = null; CACHE = null; FILA = []; APRENDIDAS = {}; LOCAL_OK = false; MODO_OFF = false;
   fecharFolha();
@@ -1066,10 +1069,27 @@ function travar(semBio) {
   document.getElementById('subtitulo').textContent = '';
   mostrarTrava('abrir', '', semBio);
 }
+// Sessão curta: ao sair do app, a chave aberta fica guardada só até o fim do tempo escolhido (sessionStorage,
+// que o Android apaga quando o app é fechado de vez). Assim, se o Android recarregar o app nesse meio tempo,
+// ele volta sem pedir digital. Passou do tempo, a sessão é apagada e o PIN ou a digital voltam a ser pedidos.
+var K_SESSAO = 'wrkz_sessao';
+function guardarSessao() {
+  try { if (CX && DKRAW && tempoBloq() > 0) sessionStorage.setItem(K_SESSAO, JSON.stringify({ dk: b64(DKRAW), ate: Date.now() + tempoBloq() })); } catch (e) {}
+}
+function apagarSessao() { try { sessionStorage.removeItem(K_SESSAO); } catch (e) {} }
+function sessaoValida() {
+  try {
+    var s = JSON.parse(sessionStorage.getItem(K_SESSAO) || 'null');
+    if (s && s.ate > Date.now()) return unb64(s.dk);
+  } catch (e) {}
+  apagarSessao(); return null;
+}
+window.addEventListener('pagehide', function () { if (!NA_BIO) { SAIU_EM = Date.now(); guardarSessao(); } });
 document.addEventListener('visibilitychange', function () {
   if (NA_BIO) return;                                   // a janela da digital não conta como "sair do app"
-  if (document.hidden) { SAIU_EM = Date.now(); if (tempoBloq() === 0) travar(true); return; }
+  if (document.hidden) { SAIU_EM = Date.now(); if (tempoBloq() === 0) travar(true); else guardarSessao(); return; }
   if (CX && SAIU_EM && Date.now() - SAIU_EM >= tempoBloq()) travar(true);
+  else apagarSessao();
   SAIU_EM = 0;
   var c = lerCofre();
   if (TV.modo === 'abrir' && travaVisivel() && c && c.bio && !TV.ocupado) setTimeout(abrirComBio, 350);
@@ -1134,7 +1154,7 @@ if (window.matchMedia) window.matchMedia('(prefers-color-scheme: dark)').addEven
 })();
 
 // ----- configurações do app (separadas dos Ajustes do orçamento) -----
-var APP_VERSAO = 'v6';
+var APP_VERSAO = 'v7';
 function folhaConfig() {
   var c = lerCofre(), conectado = !!CX;
   var h = '<h2 class="ftit">Configurações</h2>' +
@@ -1148,7 +1168,7 @@ function folhaConfig() {
   if (conectado && c) {
     h += '<h3 class="sec" style="margin-top:22px">Segurança deste aparelho</h3>' +
       '<label class="campo"><span>Bloquear o app</span><select id="aj-bloq">' +
-        [['0', 'Assim que sair do app'], ['60000', '1 minuto depois de sair'], ['300000', '5 minutos depois de sair']].map(function (o) {
+        [['0', 'Assim que sair do app'], ['30000', '30 segundos depois de sair'], ['60000', '1 minuto depois de sair'], ['300000', '5 minutos depois de sair']].map(function (o) {
           return '<option value="' + o[0] + '"' + (String(tempoBloq()) === o[0] ? ' selected' : '') + '>' + o[1] + '</option>';
         }).join('') + '</select></label>' +
       '<p class="dica" style="margin-top:-6px">Com o app aberto e 5 minutos sem mexer, ele também bloqueia.</p>' +
@@ -1373,20 +1393,25 @@ function lerPix(s) {
 }
 
 // ----- voz -----
-function folhaVoz() {
+function folhaVoz(jaOuvir) {
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  abrirFolha('voz', '<h2 class="ftit">Lançar falando</h2>' +
-    '<p class="dica">Para lançar: "gastei 35 reais no mercado", "cartão Nubank 300 em 3 vezes na farmácia", "recebi 200 de reembolso", "vou pagar 150 de luz dia 10".</p>' +
-    '<p class="dica">Para mudar o que já existe: "apagar o lançamento padaria", "marcar a internet como paga", "desfazer o pagamento da luz", ' +
-    '"mudar o vencimento da internet para dia 15", "mudar o valor da internet para 130". Antes de qualquer mudança, o app pede sua confirmação.</p>' +
-    '<p class="dica">Para buscar: "quanto gastei com mercado" ou "buscar uber".</p>' +
+  abrirFolha('voz', '<h2 class="ftit">Fale o que quer fazer</h2>' +
     '<button class="voz-btn" id="voz-btn" data-act="voz-ouvir" aria-label="Falar"' + (SR ? '' : ' disabled') + '>' + ico('mic', 36) + '</button>' +
-    '<p class="voz-txt" id="voz-txt">' + (SR ? 'Toque no microfone e fale.' : 'Este navegador não tem reconhecimento de voz.') + '</p>');
+    '<p class="voz-txt" id="voz-txt">' + (SR ? 'Toque no microfone e fale.' : 'Este navegador não tem reconhecimento de voz.') + '</p>' +
+    '<p class="dica">Para lançar: "gastei 35 reais no mercado", "cartão Nubank 300 em 3 vezes na farmácia", "recebi 200 de reembolso", "vou pagar 150 de luz dia 10".</p>' +
+    '<p class="dica">Para mudar o que já existe: "retira o gasto de hoje", "apaga o último lançamento", "tira o mercado de ontem", "marcar a internet como paga", "desfazer o pagamento da luz", ' +
+    '"mudar o vencimento da internet para dia 15", "mudar o valor da internet para 130". Antes de qualquer mudança, o app pede sua confirmação.</p>' +
+    '<p class="dica">Para buscar: "quanto gastei com mercado" ou "buscar uber".</p>');
+  if (SR && jaOuvir) ouvir();
 }
+var VOZ = null;
+function pararVoz() { if (VOZ) { try { VOZ.abort(); } catch (e) {} VOZ = null; } }
 function ouvir() {
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) return;
+  if (VOZ) { try { VOZ.stop(); } catch (e) {} return; }          // tocar de novo no microfone encerra e processa
   var r = new SR(), final = '', btn = document.getElementById('voz-btn'), out = document.getElementById('voz-txt');
+  VOZ = r;
   r.lang = 'pt-BR'; r.interimResults = true; r.maxAlternatives = 1;
   r.onresult = function (ev) {
     var t = '';
@@ -1394,15 +1419,19 @@ function ouvir() {
     if (out) out.textContent = '"' + t + '"';
     if (ev.results[ev.results.length - 1].isFinal) final = t;
   };
-  r.onerror = function (e) { if (out) out.textContent = e.error === 'not-allowed' ? 'Permita o microfone para lançar por voz.' : 'Não entendi. Toque e tente de novo.'; };
+  r.onerror = function (e) {
+    if (out) out.textContent = e.error === 'not-allowed' ? 'Permita o microfone para lançar por voz (ou toque no microfone).' :
+      e.error === 'no-speech' ? 'Não ouvi nada. Toque no microfone e fale.' : e.error === 'aborted' ? '' : 'Não entendi. Toque no microfone e tente de novo.';
+  };
   r.onend = function () {
+    if (VOZ === r) VOZ = null;
     if (btn) btn.classList.remove('ouvindo');
     if (!final || FOLHA !== 'voz') return;
     var cmd = entenderComando(final);
     if (cmd && cmd.busca) folhaBusca(cmd.busca); else if (cmd) folhaComando(cmd); else preencherLanc(entenderFala(final));
   };
-  btn.classList.add('ouvindo'); if (out) out.textContent = 'Ouvindo…';
-  r.start();
+  btn.classList.add('ouvindo'); if (out) out.textContent = 'Ouvindo… fale agora';
+  try { r.start(); } catch (e) { VOZ = null; btn.classList.remove('ouvindo'); if (out) out.textContent = 'Toque no microfone e fale.'; }
 }
 var MESES_FALA = ['janeiro', 'fevereiro', 'marco', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
 var DIAS_FALA = (function () {
@@ -1413,8 +1442,8 @@ var DIAS_FALA = (function () {
   for (var i = 1; i <= 9; i++) m['vinte e ' + u[i]] = 20 + i;
   return m;
 })();
-// Acha uma data falada. Devolve { iso, trecho } ou null.
-function extrairData(s) {
+// Acha uma data falada. Devolve { iso, trecho } ou null. Com noPassado, "dia 10" fica no mês atual mesmo se já passou.
+function extrairData(s, noPassado) {
   var palavras = Object.keys(DIAS_FALA).sort(function (a, b) { return b.length - a.length; }).join('|');
   var re = new RegExp('\\bdia (\\d{1,2}|' + palavras + ')\\b(?: de (' + MESES_FALA.join('|') + '))?');
   var m = s.match(re), dia, mes = null, trecho;
@@ -1429,7 +1458,7 @@ function extrairData(s) {
   if (!dia || dia > 31 || (mes && (mes < 1 || mes > 12))) return null;
   var ano = Number(D.hoje.slice(0, 4)), mesAtual = Number(D.hoje.slice(5, 7));
   var iso = ano + '-' + pad2(mes || mesAtual) + '-' + pad2(dia);
-  if (iso < D.hoje && difDias(iso, D.hoje) > 3) {                  // já passou: vai para o próximo mês (ou próximo ano)
+  if (!noPassado && iso < D.hoje && difDias(iso, D.hoje) > 3) {                  // já passou: vai para o próximo mês (ou próximo ano)
     if (mes) iso = (ano + 1) + iso.slice(4);
     else { var p = mesAtual === 12 ? (ano + 1) + '-01' : ano + '-' + pad2(mesAtual + 1); iso = p + '-' + pad2(dia); }
   }
@@ -1469,29 +1498,34 @@ function entenderFala(txt) {
 
 // ----- comandos por voz sobre o que já existe -----
 var COMANDO = null;
+function ddmmIso(t) {
+  if (!t) return '';
+  var p = t.split('/'), ano = Number(D.hoje.slice(0, 4)), iso = ano + '-' + p[1] + '-' + p[0];
+  return difDias(D.hoje, iso) > 45 ? (ano - 1) + iso.slice(4) : iso;
+}
 function alvosVoz() {
   var a = [];
   (D.extrato || []).forEach(function (m) {
-    if (m.removivel) a.push({ grupo: 'lanc', nome: m.desc, valor: m.valor, linha: m.linha, rotulo: (m.entrada ? 'Entrada' : 'Gasto') + ' "' + m.desc + '" de ' + brl(m.valor) + ' em ' + m.data });
+    if (m.removivel) a.push({ grupo: 'lanc', tipo: m.entrada ? 'entrada' : 'gasto', iso: ddmmIso(m.data), nome: m.desc, valor: m.valor, linha: m.linha, rotulo: (m.entrada ? 'Entrada' : 'Gasto') + ' "' + m.desc + '" de ' + brl(m.valor) + ' em ' + m.data });
   });
   (D.planejados || []).forEach(function (p) {
-    a.push({ grupo: 'plan', nome: p.desc, valor: p.valor, iso: p.iso, categoria: p.categoria, linha: p.linha, rotulo: 'Planejado "' + p.desc + '" de ' + brl(p.valor) + (p.data ? ' para ' + p.data : '') });
+    a.push({ grupo: 'plan', tipo: 'plan', nome: p.desc, valor: p.valor, iso: p.iso, categoria: p.categoria, linha: p.linha, rotulo: 'Planejado "' + p.desc + '" de ' + brl(p.valor) + (p.data ? ' para ' + p.data : '') });
   });
   (D.recebiveis || []).forEach(function (p) {
-    a.push({ grupo: 'rec', nome: p.desc, valor: p.valor, iso: p.iso, linha: p.linha, rotulo: 'A receber "' + p.desc + '" de ' + brl(p.valor) + (p.data ? ' para ' + p.data : '') });
+    a.push({ grupo: 'rec', tipo: 'entrada', nome: p.desc, valor: p.valor, iso: p.iso, linha: p.linha, rotulo: 'A receber "' + p.desc + '" de ' + brl(p.valor) + (p.data ? ' para ' + p.data : '') });
   });
   (D.fixas || []).forEach(function (c) {
-    a.push({ grupo: 'conta', nome: c.nome, id: c.id, valor: c.ok ? c.pago : c.previsto, ok: c.ok, mesSeguinte: c.mesSeguinte, rotulo: 'Conta "' + c.nome + '"' });
+    a.push({ grupo: 'conta', tipo: 'conta', iso: c.venc, nome: c.nome, id: c.id, valor: c.ok ? c.pago : c.previsto, ok: c.ok, mesSeguinte: c.mesSeguinte, rotulo: 'Conta "' + c.nome + '"' });
   });
   (D.faturas || []).forEach(function (f) {
-    a.push({ grupo: 'fatura', nome: 'fatura ' + f.nome, id: f.id, valor: f.ok ? f.pago : f.previsto, ok: f.ok, rotulo: 'Fatura ' + f.nome });
+    a.push({ grupo: 'fatura', tipo: 'conta', iso: f.venc, nome: 'fatura ' + f.nome, id: f.id, valor: f.ok ? f.pago : f.previsto, ok: f.ok, rotulo: 'Fatura ' + f.nome });
   });
   (D.cartoes || []).forEach(function (k) {
     var vistas = {};
     (k.compras || []).forEach(function (c) {
       var chave = c.desc + '|' + c.data;
       if (vistas[chave]) return; vistas[chave] = 1;
-      a.push({ grupo: 'compra', nome: c.desc + ' ' + k.nome, valor: c.valor, linha: c.linha, parcela: !!c.parcela,
+      a.push({ grupo: 'compra', tipo: 'compra', iso: ddmmIso(c.data), nome: c.desc + ' ' + k.nome, valor: c.valor, linha: c.linha, parcela: !!c.parcela,
                rotulo: 'Compra "' + c.desc + '" no ' + k.nome + ' em ' + c.data + (c.parcela ? ' (todas as parcelas)' : ' de ' + brl(c.valor)) });
     });
   });
@@ -1507,6 +1541,42 @@ function acharAlvos(s, grupos) {
   }).filter(function (x) { return x.nota >= 0.5; });
   lista.sort(function (a, b) { return b.nota - a.nota; });
   return lista.length ? lista.filter(function (x) { return x.nota >= lista[0].nota - 0.001; }).slice(0, 4) : [];
+}
+// Filtros que dá para entender sem o nome: "último", data, valor e tipo.
+function filtrosFala(s) {
+  var f = {};
+  if (/\b(ultimo|ultima|agora pouco|agorinha|acabei de lancar|que (eu )?lancei|mais recente)\b/.test(s)) f.ultimo = true;
+  var dt = /\bhoje\b/.test(s) ? { iso: D.hoje } : extrairData(s, true);
+  if (dt) f.data = dt.iso;
+  var mv = s.match(/(?:r\$\s*)(\d+(?:[.,]\d{1,2})?)|(\d+(?:[.,]\d{1,2})?)\s*(?:reais|real|conto|contos)\b/);
+  if (mv) f.valor = numBR(mv[1] || mv[2]);
+  if (/\b(entrada|recebimento|recebi|receita)\b/.test(s)) f.tipo = 'entrada';
+  else if (/\b(compra|cartao|parcela|parcelad)/.test(s)) f.tipo = 'compra';
+  else if (/\b(planejad|a pagar|vou pagar)/.test(s)) f.tipo = 'plan';
+  else if (/\b(gasto|gastei|despesa|saida)\b/.test(s)) f.tipo = 'gasto';
+  return f;
+}
+// Junta nome + filtros. Se o nome bater, usa o nome; se não, usa só os filtros e mostra as opções.
+function escolherAlvos(s, grupos, f, max) {
+  var lista = alvosVoz().filter(function (x) { return grupos.indexOf(x.grupo) >= 0; });
+  if (f.tipo) lista = lista.filter(function (x) { return x.tipo === f.tipo; });
+  if (f.data) lista = lista.filter(function (x) { return x.iso === f.data; });
+  if (f.valor) lista = lista.filter(function (x) { return Math.abs(x.valor - f.valor) < 0.01; });
+  var porNome = acharAlvosEm(s, lista);
+  if (porNome.length) return porNome;
+  if (!f.tipo && !f.data && !f.valor && !f.ultimo) return [];
+  lista.sort(function (a, b) { return (b.linha || 0) - (a.linha || 0); });
+  return f.ultimo ? lista.slice(0, 1) : lista.slice(0, max || 6);
+}
+function acharAlvosEm(s, base) {
+  var ignorar = /^(gasto|gastos|conta|contas|compra|fatura|entrada|lancamento|hoje|ontem|dia|reais|real)$/;
+  var lista = base.map(function (x) {
+    var pal = semAcento(x.nome).split(/\s+/).filter(function (w) { return (w.length >= 3 || /^\d+$/.test(w)) && !ignorar.test(w); });
+    var achou = pal.filter(function (w) { return new RegExp('\\b' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b').test(s); }).length;
+    return { x: x, nota: pal.length ? achou / pal.length + achou * 0.01 : 0 };
+  }).filter(function (o) { return o.nota >= 0.5; });
+  lista.sort(function (a, b) { return b.nota - a.nota; });
+  return lista.length ? lista.filter(function (o) { return o.nota >= lista[0].nota - 0.001; }).slice(0, 6).map(function (o) { return o.x; }) : [];
 }
 function valorFalado(s) {
   var mv = s.match(/(?:para|pra|por|em|r\$)\s*(\d{1,3}(?:\.\d{3})+(?:,\d{1,2})?|\d+(?:[.,]\d{1,2})?)(?:\s*(?:reais|real))?(?:\s*e\s*(\d{1,2})\s*centavos?)?/);
@@ -1524,10 +1594,14 @@ function entenderComando(txt) {
   var pagar = /\b(paga|pagar|pague|paguei|quita|quitar|quitei|marca|marcar|marque|recebi|chegou)\b/.test(s) && !/\bvou (pagar|receber)\b/.test(s);   // "vou pagar" é lançamento novo, não pagamento
 
   if (excluir && !desfazer) {
-    acharAlvos(s, ['lanc', 'plan', 'rec', 'compra']).forEach(function (x) {
-      op.push({ texto: 'Excluir: ' + x.rotulo, fn: 'excluirLancamento', args: [x.linha, x.parcela] });
-    });
-    return { acao: 'Excluir', ouvido: txt, op: op };
+    var fx = filtrosFala(s), alvosX = escolherAlvos(s, ['lanc', 'plan', 'rec', 'compra'], fx, 6), aviso = '';
+    if (!alvosX.length && !fx.data && !fx.valor) {               // nada específico: oferece os mais recentes
+      alvosX = alvosVoz().filter(function (x) { return ['lanc', 'compra', 'plan', 'rec'].indexOf(x.grupo) >= 0; })
+        .sort(function (a, b) { return b.linha - a.linha; }).slice(0, 6);
+      aviso = alvosX.length ? 'Não achei pelo nome. Estes são os lançamentos mais recentes:' : '';
+    }
+    alvosX.forEach(function (x) { op.push({ texto: 'Excluir: ' + x.rotulo, fn: 'excluirLancamento', args: [x.linha, !!x.parcela] }); });
+    return { acao: 'Excluir', ouvido: txt, op: op, info: aviso };
   }
   if (desfazer) {
     acharAlvos(s, ['conta', 'fatura']).filter(function (x) { return x.ok; }).forEach(function (x) {
@@ -1553,7 +1627,9 @@ function entenderComando(txt) {
     return { acao: 'Mudar valor', ouvido: txt, op: op, aviso: v > 0 ? '' : 'Não entendi o novo valor. Fale, por exemplo, "para 130 reais".' };
   }
   if (pagar) {
-    var alvos = acharAlvos(s, ['conta', 'fatura', 'plan', 'rec']).filter(function (x) { return !x.ok; });
+    var fp = filtrosFala(s); delete fp.valor; delete fp.tipo;
+    if (!/\b(conta|contas|fatura|boleto|vence|vencendo|vencimento)\b/.test(s)) { delete fp.data; delete fp.ultimo; }   // "paguei hoje 35 no mercado" é lançamento novo
+    var alvos = escolherAlvos(s, ['conta', 'fatura', 'plan', 'rec'], fp, 6).filter(function (x) { return !x.ok; });
     if (!alvos.length) return null;                                   // não é uma conta conhecida: vira lançamento novo
     var vp = valorFalado(s);
     alvos.forEach(function (x) {
@@ -1570,11 +1646,12 @@ function folhaComando(cmd) {
   COMANDO = cmd;
   var h = '<h2 class="ftit">' + cmd.acao + '</h2><p class="dica">Você disse: "' + esc(cmd.ouvido) + '"</p>';
   if (cmd.aviso) h += '<p class="dica v-warn">' + esc(cmd.aviso) + '</p>';
+  if (cmd.info) h += '<p class="dica">' + esc(cmd.info) + '</p>';
   if (cmd.op.length) {
-    h += '<p class="dica">' + (cmd.op.length > 1 ? 'Achei mais de um. Toque no certo:' : 'Confirma?') + '</p>' +
+    h += (cmd.info ? '' : '<p class="dica">' + (cmd.op.length > 1 ? 'Achei mais de um. Toque no certo:' : 'Confirma?') + '</p>') +
       cmd.op.map(function (o, i) { return '<button class="btn ' + (cmd.op.length === 1 ? 'prim ' : '') + 'full" style="margin-bottom:8px;text-align:left" data-act="voz-confirmar" data-i="' + i + '">' + esc(o.texto) + '</button>'; }).join('');
   } else if (!cmd.aviso) {
-    h += '<p class="dica v-warn">Não achei nada com esse nome neste ciclo. Tente falar o nome como aparece na tela.</p>';
+    h += '<p class="dica v-warn">Não achei nada assim neste ciclo. Tente falar o nome como aparece na tela, a data ("de hoje", "de ontem") ou o valor.</p>';
   }
   h += '<div class="botoes" style="margin-top:8px"><button class="btn" data-act="fechar-folha">Cancelar</button><button class="btn" data-act="r-voz">Falar de novo</button></div>';
   abrirFolha('comando', h);
@@ -1859,7 +1936,8 @@ function gerarRelatorio() {
 var BUSCA_T = null;
 function folhaBusca(termo) {
   abrirFolha('busca', '<h2 class="ftit">Buscar lançamentos</h2>' +
-    '<label class="campo"><span>O que você procura?</span><input id="busca-txt" type="search" autocomplete="off" placeholder="Ex.: mercado, uber, farmácia" value="' + esc(termo || '') + '"></label>' +
+    '<div class="par" style="grid-template-columns:1fr auto;align-items:end"><label class="campo"><span>O que você procura?</span><input id="busca-txt" type="search" autocomplete="off" placeholder="Ex.: mercado, uber, farmácia" value="' + esc(termo || '') + '"></label>' +
+    '<button class="icbtn" style="margin-bottom:12px" data-act="busca-voz" aria-label="Falar o que procura">' + ico('mic', 18) + '</button></div>' +
     '<div id="busca-res"><p class="dica">' + (MODO_OFF ? 'Sem internet: a busca olha só o ciclo guardado no aparelho.' : 'Busca em todos os ciclos, pela descrição ou pela categoria.') + '</p></div>');
   var i = document.getElementById('busca-txt');
   if (termo) buscar(termo); else i.focus();
@@ -1923,11 +2001,62 @@ function agendaAcao(fn, args, msg) {
     .catch(function (e) { busy(false); if (el) el.textContent = 'Não deu: ' + e.message; });
 }
 
+// Ditado curto: preenche um campo falando (usado na busca).
+function ditar(idCampo, depois) {
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition, campo = document.getElementById(idCampo);
+  if (!SR || !campo) { toast('Este navegador não tem reconhecimento de voz.', true); return; }
+  var r = new SR(); r.lang = 'pt-BR'; r.interimResults = true;
+  campo.placeholder = 'Ouvindo…';
+  r.onresult = function (ev) { var t = ''; for (var i = 0; i < ev.results.length; i++) t += ev.results[i][0].transcript; campo.value = t; };
+  r.onend = function () { campo.placeholder = 'Ex.: mercado, uber, farmácia'; if (campo.value && depois) depois(campo.value); };
+  r.onerror = function () { campo.placeholder = 'Não ouvi. Toque no microfone de novo.'; };
+  try { r.start(); } catch (e) {}
+}
+
+// Segurar o botão + por meio segundo abre direto a voz (tocar normal continua abrindo o lançamento).
+(function () {
+  var timer = null, longo = false;
+  document.addEventListener('touchstart', function (ev) {
+    var b = ev.target.closest && ev.target.closest('[data-act="lancar"]');
+    if (!b) return;
+    longo = false;
+    timer = setTimeout(function () { longo = true; if (navigator.vibrate) navigator.vibrate(20); folhaVoz(true); }, 500);
+  }, { passive: true });
+  ['touchend', 'touchmove', 'touchcancel'].forEach(function (t) { document.addEventListener(t, function () { clearTimeout(timer); }, { passive: true }); });
+  document.addEventListener('click', function (ev) {
+    if (longo && ev.target.closest && ev.target.closest('[data-act="lancar"]')) { longo = false; ev.stopImmediatePropagation(); ev.preventDefault(); }
+  }, true);
+  document.addEventListener('contextmenu', function (ev) { if (ev.target.closest && ev.target.closest('[data-act="lancar"]')) ev.preventDefault(); });
+})();
+
+// ---------- botão voltar do celular ----------
+// Enquanto houver algo para "voltar" (uma janela aberta ou outra tela que não o Início), o app guarda um passo no
+// histórico. O voltar do Android consome esse passo: fecha a janela ou volta para o Início, em vez de sair do app.
+var VOLTA_ARMADA = false, VOLTA_IGNORAR = false, VOLTA_T = null;
+function temOndeVoltar() { return !travaVisivel() && (!!FOLHA || (!!D && PAG !== 'inicio')); }
+function agendarVoltar() { clearTimeout(VOLTA_T); VOLTA_T = setTimeout(sincronizarVoltar, 60); }
+function sincronizarVoltar() {
+  if (temOndeVoltar() && !VOLTA_ARMADA) { history.pushState({ wrkz: 1 }, ''); VOLTA_ARMADA = true; }
+  else if (!temOndeVoltar() && VOLTA_ARMADA) { VOLTA_ARMADA = false; VOLTA_IGNORAR = true; history.back(); }
+}
+window.addEventListener('popstate', function () {
+  if (VOLTA_IGNORAR) { VOLTA_IGNORAR = false; return; }
+  VOLTA_ARMADA = false;
+  if (travaVisivel()) return;
+  if (FOLHA) fecharFolha();
+  else if (D && PAG !== 'inicio') { PAG = 'inicio'; render(); window.scrollTo(0, 0); }
+  agendarVoltar();
+});
+
 // ----- partida -----
 function iniciar() {
   aplicarTema();
   aplicarDiscreto();
-  if (lerCofre()) { mostrarTrava('abrir'); return; }
+  if (lerCofre()) {
+    var dk = sessaoValida();
+    if (dk) { abrirComRaw(dk).then(function () { apagarSessao(); desbloqueado(); }).catch(function () { apagarSessao(); mostrarTrava('abrir'); }); return; }
+    mostrarTrava('abrir'); return;
+  }
   var antigo = null;
   try { antigo = JSON.parse(localStorage.getItem('wrkz_conexao') || 'null'); } catch (e) {}
   if (antigo && antigo.url && antigo.chave) {             // veio do passo 3: só falta criar o PIN
@@ -1950,7 +2079,7 @@ function atalho() {
   if (acao === 'cartao') folhaLancar('Cartão');
   if (acao === 'entrada') folhaLancar('Entrada');
   if (acao === 'ler') folhaScanner();
-  if (acao === 'voz') folhaVoz();
+  if (acao === 'voz') folhaVoz(true);
   if (acao === 'compartilhado') lerCompartilhado();
 }
 
@@ -1977,7 +2106,7 @@ document.addEventListener('click', function (ev) {
   if (act === 'fila-enviar') { if (!navigator.onLine) { toast('Ainda sem internet.', true); return; } MODO_OFF = false; sincronizar(); }
   if (act === 'fila-tirar') tirarDaFila(Number(t.getAttribute('data-i')));
   if (act === 'r-cam') folhaScanner();
-  if (act === 'r-voz') folhaVoz();
+  if (act === 'r-voz') folhaVoz(true);
   if (act === 'r-comp') escolherComprovante();
   if (act === 'scan-usar') usarCodigo(val('scan-txt'), false);
   if (act === 'voz-ouvir') ouvir();
@@ -1985,6 +2114,7 @@ document.addEventListener('click', function (ev) {
   if (act === 'desfazer-ultimo') executarDesfazer();
   if (act === 'lembrete-ok') { localStorage.setItem('wrkz_lembrete', D.hoje); render(); }
   if (act === 'busca') folhaBusca();
+  if (act === 'busca-voz') ditar('busca-txt', buscar);
   if (act === 'relatorio') gerarRelatorio();
   if (act === 'agenda-ligar') agendaAcao('configurarAgenda', [true], 'Lembretes ligados');
   if (act === 'agenda-desligar') { if (confirm('Desligar os lembretes? Os eventos futuros da agenda Contas Wesley serão apagados.')) agendaAcao('configurarAgenda', [false], 'Lembretes desligados'); }
@@ -2018,6 +2148,7 @@ function render() {
     return '<button data-act="ir" data-pag="' + n[0] + '"' + (n[0] === PAG ? ' class="on" aria-current="page"' : '') + '>' + ico(n[0], 22) + '<span>' + n[1] + '</span></button>';
   }).join('');
   document.getElementById('app').innerHTML = faixaSync() + (PAG === 'inicio' ? cardLembrete() : '') + PAGINAS[PAG]();
+  agendarVoltar();
 }
 
 // ----- Início -----
@@ -2557,9 +2688,12 @@ function abrirFolha(nome, html) {
   FOLHA = nome;
   document.getElementById('folha').innerHTML = '<div class="alca"></div>' + html;
   document.getElementById('veu').className = 'aberto';
+  agendarVoltar();
 }
 function fecharFolha() {
   pararCamera();
+  pararVoz();
+  agendarVoltar();
   FOLHA = '';
   document.getElementById('veu').className = '';
   document.getElementById('folha').innerHTML = '';
