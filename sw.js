@@ -4,7 +4,7 @@
  * - Recebe o que você compartilha de outros apps (comprovante, print, texto) e entrega para o app.
  * Ao mudar qualquer arquivo do app, aumente o número da VERSAO para o celular baixar a nova versão.
  */
-const VERSAO = 'wrkz-v4';
+const VERSAO = 'wrkz-v6';
 const COMPARTILHADO = 'wrkz-compartilhado';
 const ARQUIVOS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable.png'];
 
